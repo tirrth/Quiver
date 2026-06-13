@@ -28,7 +28,7 @@ Quiver merges two previously separate apps — **AutoRaise** (focus-follows-mous
 Requires macOS 13+ and the Xcode command-line tools.
 
 ```bash
-./install.sh        # build, install to ~/Applications/Quiver.app, add a Desktop alias, launch
+./install.sh        # build, install to /Applications/Quiver.app, and launch
 ```
 
 Or step by step:
@@ -60,7 +60,7 @@ The shell handles persistence, the menu bar, windows, launch-at-login, and error
 
 ## Layout
 
-```
+```text
 Sources/Quiver/            Swift app shell (AppController, ModuleManager, UI, AppSettings, LoginItem)
 Sources/Quiver/Modules/    KeepAwake, Hosts, AutoRaise modules
 Sources/AutoRaiseEngine/   Objective-C++ AutoRaise engine + bridging header
