@@ -4,27 +4,36 @@ import SwiftUI
 struct AutoRaiseQuickControls: View {
     @ObservedObject var module: AutoRaiseModule
 
+    private var delayChoices: [Int] {
+        module.mode == .focusThenRaise ? AutoRaiseModule.focusRaiseDelayChoices : AutoRaiseModule.raiseDelayChoices
+    }
+
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "timer").foregroundStyle(.secondary).font(.caption)
+        VStack(alignment: .leading, spacing: 6) {
             Picker("", selection: Binding(
-                get: { module.delayMillis },
-                set: { module.setDelayMillis($0) }
+                get: { module.mode },
+                set: { module.setMode($0) }
             )) {
-                ForEach(AutoRaiseModule.delayChoices, id: \.self) { ms in
-                    Text(AutoRaiseModule.delayLabel(ms)).tag(ms)
+                ForEach(module.availableModes) { mode in
+                    Text(mode.displayName).tag(mode)
                 }
             }
-            .labelsHidden().controlSize(.small).frame(maxWidth: 110)
+            .labelsHidden().controlSize(.small)
 
-            Spacer()
-
-            if module.focusFirstAvailable {
-                Toggle("Focus first", isOn: Binding(
-                    get: { module.focusFirst },
-                    set: { module.setFocusFirst($0) }
-                ))
-                .toggleStyle(.checkbox).controlSize(.small).font(.caption)
+            if module.mode != .focusOnly {
+                HStack(spacing: 6) {
+                    Image(systemName: "timer").foregroundStyle(.secondary).font(.caption)
+                    Picker("", selection: Binding(
+                        get: { module.raiseDelayMillis },
+                        set: { module.setRaiseDelay($0) }
+                    )) {
+                        ForEach(delayChoices, id: \.self) { ms in
+                            Text(AutoRaiseModule.delayLabel(ms)).tag(ms)
+                        }
+                    }
+                    .labelsHidden().controlSize(.small).frame(maxWidth: 110)
+                    Spacer()
+                }
             }
         }
     }
@@ -35,47 +44,67 @@ struct AutoRaiseSettingsView: View {
     @ObservedObject var module: AutoRaiseModule
     @State private var ignoreAppsText: String = ""
 
+    private var delayChoices: [Int] {
+        module.mode == .focusThenRaise ? AutoRaiseModule.focusRaiseDelayChoices : AutoRaiseModule.raiseDelayChoices
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Card(title: "Behavior") {
-                SettingRow(
-                    title: "Raise delay",
-                    subtitle: "How long to hover before the window is raised. “Instant” raises as soon as the pointer settles on it."
-                ) {
-                    Picker("", selection: Binding(
-                        get: { module.delayMillis },
-                        set: { module.setDelayMillis($0) }
-                    )) {
-                        ForEach(AutoRaiseModule.delayChoices, id: \.self) { ms in
-                            Text(AutoRaiseModule.delayLabel(ms)).tag(ms)
+                VStack(alignment: .leading, spacing: 8) {
+                    SettingRow(
+                        title: "When you hover a window",
+                        subtitle: nil
+                    ) {
+                        Picker("", selection: Binding(
+                            get: { module.mode },
+                            set: { module.setMode($0) }
+                        )) {
+                            ForEach(module.availableModes) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
                         }
+                        .labelsHidden().frame(width: 220)
                     }
-                    .labelsHidden().frame(width: 130)
+                    Text(module.mode.explanation)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !module.focusFirstAvailable {
+                        Text("Focus-only modes aren’t available on this Mac (the focus-first engine support isn’t present).")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+
+                if module.mode != .focusOnly {
+                    Divider()
+                    SettingRow(
+                        title: module.mode == .focusThenRaise ? "Raise delay" : "Raise delay",
+                        subtitle: module.mode == .focusThenRaise
+                            ? "How long to keep hovering before the focused window is brought to the front."
+                            : "How long to hover before the window is raised. “Instant” raises as soon as the pointer settles."
+                    ) {
+                        Picker("", selection: Binding(
+                            get: { module.raiseDelayMillis },
+                            set: { module.setRaiseDelay($0) }
+                        )) {
+                            ForEach(delayChoices, id: \.self) { ms in
+                                Text(AutoRaiseModule.delayLabel(ms)).tag(ms)
+                            }
+                        }
+                        .labelsHidden().frame(width: 130)
+                    }
                 }
 
                 Divider()
 
                 SettingRow(
                     title: "Require the mouse to stop",
-                    subtitle: "Only raise once the pointer stops moving, so passing over a window on the way elsewhere doesn’t raise it."
+                    subtitle: "Only act once the pointer stops moving, so passing over a window on the way elsewhere doesn’t trigger it."
                 ) {
                     Toggle("", isOn: Binding(
                         get: { module.requireMouseStop },
                         set: { module.setRequireMouseStop($0) }
                     )).labelsHidden().toggleStyle(.switch)
-                }
-
-                if module.focusFirstAvailable {
-                    Divider()
-                    SettingRow(
-                        title: "Focus first, then raise",
-                        subtitle: "Experimental: give the hovered window keyboard focus immediately, and only raise it after the delay. Relies on private APIs."
-                    ) {
-                        Toggle("", isOn: Binding(
-                            get: { module.focusFirst },
-                            set: { module.setFocusFirst($0) }
-                        )).labelsHidden().toggleStyle(.switch)
-                    }
                 }
 
                 Divider()
@@ -112,7 +141,7 @@ struct AutoRaiseSettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Ignore these apps")
                         .font(.system(size: 13, weight: .semibold))
-                    Text("Comma-separated app names that should never be auto-raised (e.g. “IntelliJ IDEA, WebStorm”).")
+                    Text("Comma-separated app names that should never be auto-raised or focused (e.g. “IntelliJ IDEA, WebStorm”).")
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     TextField("App One, App Two", text: $ignoreAppsText)

@@ -1,29 +1,69 @@
 import SwiftUI
 
-/// Focus-follows-mouse: raises and focuses the window under the pointer. Wraps the bridged
+/// Focus-follows-mouse: raises and/or focuses the window under the pointer. Wraps the bridged
 /// Objective-C++ `AutoRaiseEngine` (extracted from AutoRaise) and feeds it config from Quiver.
 @MainActor
 final class AutoRaiseModule: UtilityModule {
+
+    /// How hovering a window behaves. Maps directly onto the engine's raise-delay / focus-delay model.
+    enum RaiseMode: String, CaseIterable, Identifiable {
+        case raiseOnHover     // raise + focus together
+        case focusThenRaise   // focus immediately (no raise), then raise after the delay
+        case focusOnly        // focus immediately, never raise
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .raiseOnHover: return "Raise on hover"
+            case .focusThenRaise: return "Focus first, then raise"
+            case .focusOnly: return "Focus only (never raise)"
+            }
+        }
+
+        var explanation: String {
+            switch self {
+            case .raiseOnHover:
+                return "Hovering a window brings it to the front and gives it keyboard focus together."
+            case .focusThenRaise:
+                return "Hovering focuses the window for typing right away (without moving it); it only comes to the front after the delay."
+            case .focusOnly:
+                return "Hovering focuses the window for typing, but windows never come to the front on their own — classic focus-follows-mouse."
+            }
+        }
+
+        /// Focus-only and focus-then-raise rely on the experimental focus-first engine support.
+        var needsFocusFirst: Bool { self != .raiseOnHover }
+    }
+
     private let engine = AutoRaiseEngine()
     private let pollMillis = 50
 
     // Persisted configuration.
-    private(set) var delayMillis: Int       // 0 = raise instantly on hover
-    private(set) var focusFirst: Bool       // focus before raising (experimental)
+    private(set) var mode: RaiseMode
+    private(set) var raiseDelayMillis: Int   // used by raiseOnHover and focusThenRaise
     private(set) var requireMouseStop: Bool
-    private(set) var warpOnSwitch: Bool      // warp pointer to window on cmd-tab / cmd-grave
-    private(set) var disableKey: String      // "control" | "option" | "disabled"
-    private(set) var ignoreApps: String      // comma-separated app names
+    private(set) var warpOnSwitch: Bool       // warp pointer to window on cmd-tab / cmd-grave
+    private(set) var disableKey: String       // "control" | "option" | "disabled"
+    private(set) var ignoreApps: String       // comma-separated app names
 
     private var lastTrusted: Bool
 
-    static let delayChoices: [Int] = [0, 200, 400, 700, 1000]
+    /// Raise-delay options (ms). 0 = Instant. Used for "Raise on hover".
+    static let raiseDelayChoices: [Int] = [0, 200, 400, 700, 1000]
+    /// "Focus first, then raise" needs a real (non-instant) raise delay, otherwise it's identical to raise-on-hover.
+    static let focusRaiseDelayChoices: [Int] = [200, 400, 700, 1000]
     static let disableKeyChoices: [String] = ["control", "option", "disabled"]
 
     init() {
         let d = UserDefaults.standard
-        delayMillis = d.object(forKey: "module.autoraise.delayMillis") as? Int ?? 0
-        focusFirst = d.bool(forKey: "module.autoraise.focusFirst")
+        if let raw = d.string(forKey: "module.autoraise.mode"), let m = RaiseMode(rawValue: raw) {
+            mode = m
+        } else {
+            // Migrate from the earlier "focusFirst" boolean.
+            mode = d.bool(forKey: "module.autoraise.focusFirst") ? .focusThenRaise : .raiseOnHover
+        }
+        raiseDelayMillis = d.object(forKey: "module.autoraise.delayMillis") as? Int ?? 0
         requireMouseStop = d.object(forKey: "module.autoraise.requireMouseStop") as? Bool ?? true
         warpOnSwitch = d.bool(forKey: "module.autoraise.warpOnSwitch")
         disableKey = d.string(forKey: "module.autoraise.disableKey") ?? "control"
@@ -33,12 +73,20 @@ final class AutoRaiseModule: UtilityModule {
         super.init(
             id: "autoraise",
             title: "AutoRaise",
-            subtitle: "Raise and focus a window just by hovering over it (focus-follows-mouse).",
+            subtitle: "Raise and/or focus a window just by hovering over it (focus-follows-mouse).",
             symbolName: "macwindow.on.rectangle"
         )
+
+        // If the engine can't do focus-first on this machine, force a safe mode.
+        if mode.needsFocusFirst && !focusFirstAvailable { mode = .raiseOnHover }
     }
 
     var focusFirstAvailable: Bool { AutoRaiseEngine.focusFirstAvailable }
+
+    /// Modes actually selectable on this machine.
+    var availableModes: [RaiseMode] {
+        focusFirstAvailable ? RaiseMode.allCases : [.raiseOnHover]
+    }
 
     // MARK: Lifecycle
 
@@ -57,11 +105,26 @@ final class AutoRaiseModule: UtilityModule {
         engine.start(config: buildConfig())
     }
 
+    private func ticks(forDelayMillis ms: Int) -> Int {
+        ms <= 0 ? 1 : (ms / pollMillis) + 1
+    }
+
     private func buildConfig() -> AutoRaiseConfig {
         let config = AutoRaiseConfig()
         config.pollMillis = pollMillis
-        config.delay = delayMillis <= 0 ? 1 : (delayMillis / pollMillis) + 1
-        config.focusDelay = (focusFirst && focusFirstAvailable) ? 1 : 0
+
+        switch (focusFirstAvailable ? mode : .raiseOnHover) {
+        case .raiseOnHover:
+            config.focusDelay = 0
+            config.delay = ticks(forDelayMillis: raiseDelayMillis)   // 1 = instant, n = after (n-1)*poll
+        case .focusThenRaise:
+            config.focusDelay = 1                                    // focus immediately
+            config.delay = ticks(forDelayMillis: max(200, raiseDelayMillis))  // then raise after the delay
+        case .focusOnly:
+            config.focusDelay = 1                                    // focus immediately
+            config.delay = 0                                         // never raise
+        }
+
         config.warpX = 0.5
         config.warpY = 0.5
         config.scale = 2.0
@@ -82,15 +145,20 @@ final class AutoRaiseModule: UtilityModule {
 
     // MARK: Configuration setters (restart the engine live when on)
 
-    func setDelayMillis(_ value: Int) {
-        delayMillis = value
-        UserDefaults.standard.set(value, forKey: defaultsKey("delayMillis"))
+    func setMode(_ value: RaiseMode) {
+        mode = value
+        // "Focus first, then raise" needs a non-instant raise delay to differ from raise-on-hover.
+        if value == .focusThenRaise && raiseDelayMillis < 200 {
+            raiseDelayMillis = 200
+            UserDefaults.standard.set(200, forKey: defaultsKey("delayMillis"))
+        }
+        UserDefaults.standard.set(value.rawValue, forKey: defaultsKey("mode"))
         restartIfRunning(); notifyChange()
     }
 
-    func setFocusFirst(_ value: Bool) {
-        focusFirst = value
-        UserDefaults.standard.set(value, forKey: defaultsKey("focusFirst"))
+    func setRaiseDelay(_ ms: Int) {
+        raiseDelayMillis = ms
+        UserDefaults.standard.set(ms, forKey: defaultsKey("delayMillis"))
         restartIfRunning(); notifyChange()
     }
 
@@ -137,8 +205,7 @@ final class AutoRaiseModule: UtilityModule {
         let trusted = AutoRaiseEngine.isAccessibilityTrusted()
         if trusted != lastTrusted {
             lastTrusted = trusted
-            // Once the user grants access, (re)start so the event tap/AX hooks take effect.
-            if trusted { restartIfRunning() }
+            if trusted { restartIfRunning() }   // (re)start once access is granted
             notifyChange()
         }
     }
@@ -147,11 +214,17 @@ final class AutoRaiseModule: UtilityModule {
 
     override var statusSummary: String {
         guard isEnabled else { return "Off" }
-        var parts = ["On"]
-        parts.append(delayMillis <= 0 ? "instant" : "\(delayMillis)ms delay")
-        if focusFirst && focusFirstAvailable { parts.append("focus-first") }
+        var parts: [String] = []
+        switch (focusFirstAvailable ? mode : .raiseOnHover) {
+        case .raiseOnHover:
+            parts.append(raiseDelayMillis <= 0 ? "raise instantly" : "raise after \(raiseDelayMillis)ms")
+        case .focusThenRaise:
+            parts.append("focus now, raise after \(max(200, raiseDelayMillis))ms")
+        case .focusOnly:
+            parts.append("focus only")
+        }
         if !AutoRaiseEngine.isAccessibilityTrusted() { parts.append("needs access") }
-        return parts.joined(separator: " · ")
+        return "On · " + parts.joined(separator: " · ")
     }
 
     override func makeQuickControls() -> AnyView? {
