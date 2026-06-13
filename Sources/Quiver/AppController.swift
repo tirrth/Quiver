@@ -311,7 +311,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func refreshModulePermissions() {
-        for module in manager.modules where module.isEnabled { module.notifyChange() }
+        for module in manager.modules { module.periodicRefresh() }
         updateStatusButton()
     }
 

@@ -96,6 +96,10 @@ class UtilityModule: ObservableObject, Identifiable {
         errorReporter?(message)
     }
 
+    /// Called periodically by the shell (≈ every 2s). Override to re-check OS permissions or
+    /// external state (e.g. AutoRaise watching for Accessibility to be granted).
+    func periodicRefresh() {}
+
     // MARK: Persistence helpers
 
     /// Namespaced UserDefaults key, e.g. `module.keepawake.duration`.

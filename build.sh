@@ -58,7 +58,8 @@ if [[ -f "$ENGINE_SRC" ]]; then
     -F /System/Library/PrivateFrameworks \
     -c "$ENGINE_SRC" -o "$ENGINE_OBJ"
   SWIFT_ENGINE_ARGS=(-import-objc-header "$BRIDGING_HEADER")
-  ENGINE_FRAMEWORKS=(-framework ApplicationServices -framework Carbon -F /System/Library/PrivateFrameworks)
+  # -lc++ links the C++ runtime the Objective-C++ engine needs.
+  ENGINE_FRAMEWORKS=(-lc++ -framework ApplicationServices -framework Carbon -F /System/Library/PrivateFrameworks)
   (( SKYLIGHT == 1 )) && ENGINE_FRAMEWORKS+=(-framework SkyLight)
 fi
 
