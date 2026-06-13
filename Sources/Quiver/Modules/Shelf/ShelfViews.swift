@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 
 struct ShelfDrawerContent: View {
     @ObservedObject var store: ShelfStore
+    let edge: ShelfEdge
     let columns: Int
     let onClear: () -> Void
     let onClose: () -> Void
@@ -16,50 +17,60 @@ struct ShelfDrawerContent: View {
         Array(repeating: GridItem(.fixed(ShelfMetrics.tile.width), spacing: ShelfMetrics.spacing), count: columns)
     }
 
+    /// Rounded only on the inner side; flat on the side touching the screen edge, so it reads as a
+    /// drawer emerging from that edge.
+    private var shape: UnevenRoundedRectangle {
+        let r = ShelfMetrics.cornerRadius
+        switch edge {
+        case .right:  return .init(topLeadingRadius: r, bottomLeadingRadius: r, bottomTrailingRadius: 0, topTrailingRadius: 0, style: .continuous)
+        case .left:   return .init(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: r, topTrailingRadius: r, style: .continuous)
+        case .top:    return .init(topLeadingRadius: 0, bottomLeadingRadius: r, bottomTrailingRadius: r, topTrailingRadius: 0, style: .continuous)
+        case .bottom: return .init(topLeadingRadius: r, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: r, style: .continuous)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider().opacity(0.35)
+            Divider().opacity(0.3)
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(targeted ? Color.accentColor : Color.white.opacity(0.10),
-                              lineWidth: targeted ? 2 : 1)
-        )
+        .background(.regularMaterial)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(targeted ? Color.accentColor : Color.primary.opacity(0.10),
+                                    lineWidth: targeted ? 2 : 1))
         .onDrop(of: [UTType.fileURL], isTargeted: $targeted) { providers in handleDrop(providers) }
     }
 
     private var header: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "tray.full").font(.system(size: 11)).foregroundStyle(.secondary)
-            Text(store.isEmpty ? "Shelf" : "\(store.count)")
-                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+        HStack(spacing: 7) {
+            Image(systemName: "tray.full").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+            Text(store.isEmpty ? "Shelf" : "\(store.count) file\(store.count == 1 ? "" : "s")")
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.primary.opacity(0.85))
             Spacer()
             if !store.isEmpty {
                 Button(action: onClear) { Image(systemName: "trash") }
-                    .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.secondary).help("Clear all")
+                    .buttonStyle(.plain).foregroundStyle(.secondary).help("Clear all")
             }
             Button(action: onClose) { Image(systemName: "xmark") }
-                .buttonStyle(.plain).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).help("Hide")
+                .buttonStyle(.plain).foregroundStyle(.secondary).help("Hide")
         }
-        .padding(.horizontal, 12)
+        .font(.system(size: 12))
+        .padding(.horizontal, 14)
         .frame(height: ShelfMetrics.headerHeight)
     }
 
     @ViewBuilder
     private var content: some View {
         if store.isEmpty {
-            VStack(spacing: 6) {
-                Image(systemName: "tray.and.arrow.down").font(.system(size: 24)).foregroundStyle(.secondary)
-                Text("Drag files here").font(.caption.weight(.medium))
-                Text("then drag them back out").font(.caption2).foregroundStyle(.tertiary)
+            VStack(spacing: 7) {
+                Image(systemName: "tray.and.arrow.down").font(.system(size: 26)).foregroundStyle(.tertiary)
+                Text("Drag files here").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                Text("then drag them back out").font(.system(size: 11)).foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(8)
+            .padding(10)
         } else {
             ScrollView {
                 LazyVGrid(columns: gridColumns, spacing: ShelfMetrics.spacing) {
@@ -69,6 +80,7 @@ struct ShelfDrawerContent: View {
                 }
                 .padding(ShelfMetrics.padding)
             }
+            .scrollIndicators(.never)
         }
     }
 
@@ -93,60 +105,85 @@ private struct ShelfTileView: View {
     let onRemove: () -> Void
 
     @State private var thumb: NSImage?
+    @State private var hovering = false
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 5) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.07))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.14 : 0.07))
                 if let thumb {
-                    Image(nsImage: thumb).resizable().aspectRatio(contentMode: .fit).padding(6)
+                    Image(nsImage: thumb).resizable().aspectRatio(contentMode: .fit).padding(7)
                 } else {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
-                        .resizable().aspectRatio(contentMode: .fit).frame(width: 38, height: 38)
+                        .resizable().aspectRatio(contentMode: .fit).frame(width: 46, height: 46)
                 }
             }
-            .frame(width: ShelfMetrics.tile.width, height: 64)
+            .frame(width: ShelfMetrics.tile.width, height: ShelfMetrics.previewHeight)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+            )
 
             Text(item.displayName)
-                .font(.system(size: 10)).lineLimit(1).truncationMode(.middle)
+                .font(.system(size: 10.5)).foregroundStyle(.secondary)
+                .lineLimit(1).truncationMode(.middle)
                 .frame(width: ShelfMetrics.tile.width)
         }
         .frame(width: ShelfMetrics.tile.width, height: ShelfMetrics.tile.height)
+        .scaleEffect(hovering ? 1.04 : 1.0)
+        .animation(.easeOut(duration: 0.12), value: hovering)
         .contentShape(Rectangle())
-        // The AppKit handle covers the whole tile: left-drag = drag the file out, right-click = menu.
-        .overlay(FileDragHandle(url: item.url, onRemove: onRemove))
+        // Whole tile is the AppKit handle: left-drag = drag file out, right-click = menu, hover = lift.
+        .overlay(FileDragHandle(url: item.url, onRemove: onRemove, onHoverChange: { hovering = $0 }))
         .help("Drag out to move/copy · right-click for options")
-        .task(id: item.url) {
-            thumb = await ThumbnailLoader.thumbnail(for: item.url)
-        }
+        .task(id: item.url) { thumb = await ThumbnailLoader.thumbnail(for: item.url) }
     }
 }
 
-// MARK: - AppKit drag source (drag a file out + right-click menu)
+// MARK: - AppKit drag source (drag out + right-click menu + hover)
 
 private struct FileDragHandle: NSViewRepresentable {
     let url: URL
     let onRemove: () -> Void
+    let onHoverChange: (Bool) -> Void
 
-    func makeNSView(context: Context) -> NSView { DragSourceView(url: url, onRemove: onRemove) }
+    func makeNSView(context: Context) -> NSView {
+        DragSourceView(url: url, onRemove: onRemove, onHoverChange: onHoverChange)
+    }
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let view = nsView as? DragSourceView else { return }
         view.url = url
         view.onRemove = onRemove
+        view.onHoverChange = onHoverChange
     }
 }
 
 private final class DragSourceView: NSView, NSDraggingSource {
     var url: URL
     var onRemove: () -> Void
+    var onHoverChange: (Bool) -> Void
     private var mouseDownPoint: NSPoint?
 
-    init(url: URL, onRemove: @escaping () -> Void) {
+    init(url: URL, onRemove: @escaping () -> Void, onHoverChange: @escaping (Bool) -> Void) {
         self.url = url
         self.onRemove = onRemove
+        self.onHoverChange = onHoverChange
         super.init(frame: .zero)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self, userInfo: nil
+        ))
+    }
+    override func mouseEntered(with event: NSEvent) { onHoverChange(true) }
+    override func mouseExited(with event: NSEvent) { onHoverChange(false) }
 
     override func mouseDown(with event: NSEvent) { mouseDownPoint = event.locationInWindow }
     override func mouseUp(with event: NSEvent) { mouseDownPoint = nil }
@@ -154,18 +191,18 @@ private final class DragSourceView: NSView, NSDraggingSource {
     override func mouseDragged(with event: NSEvent) {
         guard let start = mouseDownPoint else { return }
         let p = event.locationInWindow
-        guard hypot(p.x - start.x, p.y - start.y) >= 4 else { return }   // small threshold
+        guard hypot(p.x - start.x, p.y - start.y) >= 4 else { return }
         mouseDownPoint = nil
 
         let dragItem = NSDraggingItem(pasteboardWriter: url as NSURL)
         let icon = NSWorkspace.shared.icon(forFile: url.path)
-        icon.size = NSSize(width: 48, height: 48)
-        dragItem.setDraggingFrame(NSRect(x: bounds.midX - 24, y: bounds.midY - 24, width: 48, height: 48), contents: icon)
+        icon.size = NSSize(width: 56, height: 56)
+        dragItem.setDraggingFrame(NSRect(x: bounds.midX - 28, y: bounds.midY - 28, width: 56, height: 56), contents: icon)
         beginDraggingSession(with: [dragItem], event: event, source: self)
     }
 
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
-        .copy   // copy the file out (non-destructive)
+        .copy
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -178,7 +215,6 @@ private final class DragSourceView: NSView, NSDraggingSource {
         menu.addItem(reveal)
         return menu
     }
-
     @objc private func removeItem() { onRemove() }
     @objc private func reveal() { NSWorkspace.shared.activateFileViewerSelecting([url]) }
 }
@@ -186,8 +222,7 @@ private final class DragSourceView: NSView, NSDraggingSource {
 // MARK: - Thumbnails (native image/PDF previews, icon fallback otherwise)
 
 enum ThumbnailLoader {
-    /// Returns a real preview for image/PDF files; nil for everything else (the tile then shows the
-    /// file-type icon). Loads off the main thread and skips very large files.
+    @MainActor
     static func thumbnail(for url: URL) async -> NSImage? {
         guard
             let type = UTType(filenameExtension: url.pathExtension),
@@ -197,7 +232,9 @@ enum ThumbnailLoader {
         if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 25_000_000 {
             return nil
         }
-        return await Task.detached(priority: .utility) { NSImage(contentsOf: url) }.value
+        // Read bytes off the main thread (Data is Sendable), build the image on the main actor.
+        let data = await Task.detached(priority: .utility) { try? Data(contentsOf: url) }.value
+        return data.flatMap(NSImage.init(data:))
     }
 }
 

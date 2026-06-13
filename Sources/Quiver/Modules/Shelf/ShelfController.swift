@@ -225,6 +225,7 @@ final class ShelfController: NSObject {
         let host = NSHostingController(
             rootView: ShelfDrawerContent(
                 store: store,
+                edge: edge,
                 columns: ShelfMetrics.columns(for: edge),
                 onClear: { [weak self] in self?.store.clear() },
                 onClose: { [weak self] in self?.hideDrawer() }
@@ -246,12 +247,12 @@ final class ShelfController: NSObject {
 
     private func drawerFrame(on screen: NSScreen, edge: ShelfEdge, size: NSSize) -> NSRect {
         let vf = screen.visibleFrame
-        let margin: CGFloat = 8
+        // Flush against the edge so it reads as "attached" / sliding out of the screen side.
         switch edge {
-        case .right:  return NSRect(x: vf.maxX - size.width - margin, y: vf.midY - size.height / 2, width: size.width, height: size.height)
-        case .left:   return NSRect(x: vf.minX + margin,              y: vf.midY - size.height / 2, width: size.width, height: size.height)
-        case .top:    return NSRect(x: vf.midX - size.width / 2,      y: vf.maxY - size.height - margin, width: size.width, height: size.height)
-        case .bottom: return NSRect(x: vf.midX - size.width / 2,      y: vf.minY + margin,           width: size.width, height: size.height)
+        case .right:  return NSRect(x: vf.maxX - size.width, y: vf.midY - size.height / 2, width: size.width, height: size.height)
+        case .left:   return NSRect(x: vf.minX,              y: vf.midY - size.height / 2, width: size.width, height: size.height)
+        case .top:    return NSRect(x: vf.midX - size.width / 2, y: vf.maxY - size.height, width: size.width, height: size.height)
+        case .bottom: return NSRect(x: vf.midX - size.width / 2, y: vf.minY,               width: size.width, height: size.height)
         }
     }
 

@@ -27,11 +27,13 @@ enum ShelfEdge: String, CaseIterable, Identifiable {
 /// Shared geometry so the window size (computed in the controller) matches the tile grid
 /// (rendered in SwiftUI). The drawer is sized to its contents so it stays compact.
 enum ShelfMetrics {
-    static let tile = CGSize(width: 78, height: 94)   // thumbnail + name label
-    static let spacing: CGFloat = 10
-    static let padding: CGFloat = 12
-    static let headerHeight: CGFloat = 34
-    static let emptyBodyHeight: CGFloat = 104
+    static let tile = CGSize(width: 96, height: 112)   // preview + name label
+    static let previewHeight: CGFloat = 82
+    static let spacing: CGFloat = 12
+    static let padding: CGFloat = 14
+    static let headerHeight: CGFloat = 38
+    static let emptyBodyHeight: CGFloat = 122
+    static let cornerRadius: CGFloat = 16
 
     static func columns(for edge: ShelfEdge) -> Int {
         switch edge {
