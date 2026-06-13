@@ -28,12 +28,23 @@ struct HubPopoverView: View {
                 }
                 .padding(.vertical, 4)
             }
+            // Size to content, but cap the list height and scroll beyond it (small screens / many modules).
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxHeight: 460)
+            .scrollIndicators(.never)
 
             Divider()
             footer
         }
         .frame(width: 360)
-        .frame(maxHeight: 520)
+        .fixedSize(horizontal: false, vertical: true)
+        // Chrome for the borderless panel (NSPopover used to provide this).
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
     }
 
     private var header: some View {

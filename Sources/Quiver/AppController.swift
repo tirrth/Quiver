@@ -13,7 +13,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private let launchesInBackground: Bool
     private var statusItem: NSStatusItem?
-    private let popover = NSPopover()
+    private var hubPopover: MenuBarPopover?
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var allowsTermination = false
@@ -151,11 +151,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         statusItem = item
 
-        popover.behavior = .transient
-        popover.animates = true
-        popover.contentSize = NSSize(width: 360, height: 460)
-        popover.contentViewController = NSHostingController(
-            rootView: HubPopoverView(
+        hubPopover = MenuBarPopover(content: AnyView(
+            HubPopoverView(
                 manager: manager,
                 settings: settings,
                 onOpenApp: { [weak self] in self?.showMainWindow() },
@@ -166,7 +163,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 onOpenSettings: { [weak self] in self?.showSettingsWindow() },
                 onQuit: { [weak self] in self?.quitCompletely() }
             )
-        )
+        ))
     }
 
     @objc private func statusButtonClicked(_ sender: NSStatusBarButton) {
@@ -178,24 +175,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func togglePopover(_ sender: NSStatusBarButton) {
-        if popover.isShown {
-            closePopover()
-            return
-        }
         refreshModulePermissions()
-        NSApp.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
-        // Float the popover above other windows and key it so controls work immediately.
-        DispatchQueue.main.async { [weak self] in
-            guard let window = self?.popover.contentViewController?.view.window else { return }
-            window.level = .statusBar
-            window.collectionBehavior = [.moveToActiveSpace, .transient, .fullScreenAuxiliary]
-            window.makeKeyAndOrderFront(nil)
-        }
+        hubPopover?.toggle(relativeTo: sender)
     }
 
     private func closePopover() {
-        if popover.isShown { popover.performClose(nil) }
+        hubPopover?.close()
     }
 
     /// Simple right-click fallback menu mirroring the popover toggles.
