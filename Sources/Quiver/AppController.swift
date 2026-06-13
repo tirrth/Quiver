@@ -34,7 +34,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         [
             AutoRaiseModule(),
             HostsModule(),
-            KeepAwakeModule()
+            KeepAwakeModule(),
+            ShelfModule()
         ]
     }
 
