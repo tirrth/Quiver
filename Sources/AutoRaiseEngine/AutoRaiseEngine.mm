@@ -1317,7 +1317,8 @@ CGEventRef eventTapHandler(CGEventTapProxy proxy, CGEventType type, CGEventRef e
     oldCorrectedPoint = CGPointZero;
     lastDestroyedMouseWindow_id = kCGNullWindowID;
 
-    isAccessibilityTrusted(true);
+    // Don't prompt on start; the Quiver UI's "Grant Access" button calls +promptAccessibility
+    // explicitly. (AX calls simply no-op until access is granted.)
     CGSGetCursorScale(CGSMainConnectionID(), &oldScale);
 
     eventTap = CGEventTapCreate(

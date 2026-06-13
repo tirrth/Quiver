@@ -107,6 +107,15 @@ chmod 755 "$MACOS_DIR/$APP_NAME"
 # ---------- Bundle metadata + signing ----------
 cp "$ROOT_DIR/App/Info.plist" "$CONTENTS_DIR/Info.plist"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
-codesign --force --deep --sign - --entitlements "$ROOT_DIR/App/Quiver.entitlements" "$APP_DIR" >/dev/null
 
-echo "Built $APP_DIR"
+# Prefer a stable local identity (see scripts/setup-stable-signing.sh) so macOS keeps the
+# Accessibility grant across rebuilds; fall back to ad-hoc if it isn't set up.
+SIGN_IDENTITY="${QUIVER_SIGN_IDENTITY:-Quiver Local Signing}"
+ENTITLEMENTS="$ROOT_DIR/App/Quiver.entitlements"
+if security find-certificate -c "$SIGN_IDENTITY" >/dev/null 2>&1 \
+   && codesign --force --deep --sign "$SIGN_IDENTITY" --entitlements "$ENTITLEMENTS" "$APP_DIR" 2>/dev/null; then
+  echo "Built $APP_DIR (signed: $SIGN_IDENTITY)"
+else
+  codesign --force --deep --sign - --entitlements "$ENTITLEMENTS" "$APP_DIR" >/dev/null
+  echo "Built $APP_DIR (signed: ad-hoc)"
+fi
