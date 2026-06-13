@@ -28,17 +28,26 @@ class UtilityModule: ObservableObject, Identifiable {
     /// SF Symbol shown in the menu and sidebar.
     let symbolName: String
 
+    /// `true` for background utilities with an on/off engine (AutoRaise, KeepAwake). `false` for
+    /// "tool" utilities you simply open and use (Hosts), which show an Open affordance instead of a
+    /// switch and surface their controls without an enabled gate.
+    let isToggleable: Bool
+
     /// Set by `ModuleManager`. Invoke (via `notifyChange()`) whenever user-visible state changes
     /// so the menu-bar status item and popover refresh.
     var onStateChange: (() -> Void)?
 
+    /// Set by `ModuleManager`. Route a user-facing error to the shell (shows an alert).
+    var errorReporter: ((String) -> Void)?
+
     @Published private(set) var isEnabled = false
 
-    init(id: String, title: String, subtitle: String, symbolName: String) {
+    init(id: String, title: String, subtitle: String, symbolName: String, isToggleable: Bool = true) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
         self.symbolName = symbolName
+        self.isToggleable = isToggleable
     }
 
     // MARK: Lifecycle — override these
@@ -80,6 +89,11 @@ class UtilityModule: ObservableObject, Identifiable {
     func notifyChange() {
         objectWillChange.send()
         onStateChange?()
+    }
+
+    /// Surface a user-facing error (e.g. a cancelled admin prompt) through the shell.
+    func reportError(_ message: String) {
+        errorReporter?(message)
     }
 
     // MARK: Persistence helpers

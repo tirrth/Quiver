@@ -60,9 +60,11 @@ private struct SidebarModuleLabel: View {
         HStack {
             Label(module.title, systemImage: module.symbolName)
             Spacer()
-            Circle()
-                .fill(module.isEnabled ? Color.green : Color.secondary.opacity(0.4))
-                .frame(width: 7, height: 7)
+            if module.isToggleable {
+                Circle()
+                    .fill(module.isEnabled ? Color.green : Color.secondary.opacity(0.4))
+                    .frame(width: 7, height: 7)
+            }
         }
     }
 }
@@ -93,11 +95,13 @@ struct ModuleDetailView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 10)
-                    Toggle("", isOn: isOn)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .controlSize(.large)
-                        .disabled(module.permission.unavailableReason != nil)
+                    if module.isToggleable {
+                        Toggle("", isOn: isOn)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.large)
+                            .disabled(module.permission.unavailableReason != nil)
+                    }
                 }
 
                 if let reason = module.permission.unavailableReason {

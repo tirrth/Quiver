@@ -43,7 +43,7 @@ struct HubPopoverView: View {
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Quiver").font(.system(size: 14, weight: .bold))
-                Text("\(manager.enabledCount) of \(manager.modules.count) on")
+                Text(manager.enabledCount == 1 ? "1 utility active" : "\(manager.enabledCount) utilities active")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()

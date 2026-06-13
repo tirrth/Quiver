@@ -10,12 +10,18 @@ final class ModuleManager: ObservableObject {
     /// Called whenever any module reports a visible state change (used to refresh the menu bar).
     var onAnyStateChange: (() -> Void)?
 
+    /// Called when a module reports a user-facing error (used to present an alert).
+    var onError: ((String) -> Void)?
+
     init(modules: [UtilityModule]) {
         self.modules = modules
         for module in modules {
             module.onStateChange = { [weak self] in
                 self?.objectWillChange.send()
                 self?.onAnyStateChange?()
+            }
+            module.errorReporter = { [weak self] message in
+                self?.onError?(message)
             }
         }
     }

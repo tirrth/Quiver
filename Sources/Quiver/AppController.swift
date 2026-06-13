@@ -26,6 +26,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         settings.errorHandler = { [weak self] message in self?.presentError(message) }
         manager.onAnyStateChange = { [weak self] in self?.updateStatusButton() }
+        manager.onError = { [weak self] message in self?.presentError(message) }
     }
 
     /// The full set of utilities Quiver ships with. Add new modules here.
