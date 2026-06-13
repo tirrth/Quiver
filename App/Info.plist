@@ -30,6 +30,8 @@
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>Quiver. Bundles AutoRaise (GPLv3, © sbmpost). See LICENSE.md.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Quiver's Mirror lets you quickly check your webcam before a meeting.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>
