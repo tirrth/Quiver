@@ -154,8 +154,8 @@ final class ShelfController: NSObject {
         window.alphaValue = 0
         window.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.22
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.duration = 0.28
+            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.18, 0.9, 0.2, 1) // snappy ease-out
             window.animator().setFrame(onFrame, display: true)
             window.animator().alphaValue = 1
         }

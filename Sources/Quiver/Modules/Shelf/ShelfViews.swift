@@ -17,8 +17,7 @@ struct ShelfDrawerContent: View {
         Array(repeating: GridItem(.fixed(ShelfMetrics.tile.width), spacing: ShelfMetrics.spacing), count: columns)
     }
 
-    /// Rounded only on the inner side; flat on the side touching the screen edge, so it reads as a
-    /// drawer emerging from that edge.
+    /// Rounded only on the inner side; flat on the side touching the screen edge.
     private var shape: UnevenRoundedRectangle {
         let r = ShelfMetrics.cornerRadius
         switch edge {
@@ -38,16 +37,25 @@ struct ShelfDrawerContent: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
         .clipShape(shape)
-        .overlay(shape.strokeBorder(targeted ? Color.accentColor : Color.primary.opacity(0.10),
-                                    lineWidth: targeted ? 2 : 1))
+        .overlay(
+            shape.strokeBorder(targeted ? Color.accentColor : Color.primary.opacity(0.10),
+                               lineWidth: targeted ? 2 : 1)
+        )
+        .animation(.easeOut(duration: 0.15), value: targeted)
         .onDrop(of: [UTType.fileURL], isTargeted: $targeted) { providers in handleDrop(providers) }
     }
 
     private var header: some View {
         HStack(spacing: 7) {
-            Image(systemName: "tray.full").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
-            Text(store.isEmpty ? "Shelf" : "\(store.count) file\(store.count == 1 ? "" : "s")")
-                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.primary.opacity(0.85))
+            Image(systemName: "tray.full.fill").font(.system(size: 11)).foregroundStyle(.secondary)
+            Text("Shelf").font(.system(size: 12.5, weight: .semibold)).foregroundStyle(.primary.opacity(0.9))
+            if !store.isEmpty {
+                Text("\(store.count)")
+                    .font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 1.5)
+                    .background(Capsule().fill(Color.primary.opacity(0.10)))
+                    .transition(.scale.combined(with: .opacity))
+            }
             Spacer()
             if !store.isEmpty {
                 Button(action: onClear) { Image(systemName: "trash") }
@@ -56,9 +64,10 @@ struct ShelfDrawerContent: View {
             Button(action: onClose) { Image(systemName: "xmark") }
                 .buttonStyle(.plain).foregroundStyle(.secondary).help("Hide")
         }
-        .font(.system(size: 12))
+        .font(.system(size: 11))
         .padding(.horizontal, 14)
         .frame(height: ShelfMetrics.headerHeight)
+        .animation(.spring(response: 0.3, dampingFraction: 0.72), value: store.isEmpty)
     }
 
     @ViewBuilder
@@ -71,14 +80,20 @@ struct ShelfDrawerContent: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(10)
+            .transition(.opacity)
         } else {
             ScrollView {
                 LazyVGrid(columns: gridColumns, spacing: ShelfMetrics.spacing) {
                     ForEach(store.items) { item in
                         ShelfTileView(item: item, onRemove: { store.remove(item) })
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.55).combined(with: .opacity),
+                                removal: .scale(scale: 0.82).combined(with: .opacity)
+                            ))
                     }
                 }
                 .padding(ShelfMetrics.padding)
+                .animation(.spring(response: 0.34, dampingFraction: 0.74), value: store.items)
             }
             .scrollIndicators(.never)
         }
@@ -98,41 +113,53 @@ struct ShelfDrawerContent: View {
     }
 }
 
-// MARK: - File tile
+// MARK: - File tile (elevated card)
 
 private struct ShelfTileView: View {
     let item: ShelfItem
     let onRemove: () -> Void
 
+    @Environment(\.colorScheme) private var scheme
     @State private var thumb: NSImage?
     @State private var hovering = false
 
+    private var dark: Bool { scheme == .dark }
+
     var body: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 6) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.primary.opacity(hovering ? 0.14 : 0.07))
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [dark ? Color.white.opacity(0.15) : Color.white,
+                                 dark ? Color.white.opacity(0.05) : Color(white: 0.96)],
+                        startPoint: .top, endPoint: .bottom))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(dark ? Color.white.opacity(0.10) : Color.black.opacity(0.06), lineWidth: 1)
+                    )
+
                 if let thumb {
-                    Image(nsImage: thumb).resizable().aspectRatio(contentMode: .fit).padding(7)
+                    Image(nsImage: thumb)
+                        .resizable().aspectRatio(contentMode: .fill)
+                        .frame(width: ShelfMetrics.tile.width - 12, height: ShelfMetrics.previewHeight - 12)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 } else {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
-                        .resizable().aspectRatio(contentMode: .fit).frame(width: 46, height: 46)
+                        .resizable().aspectRatio(contentMode: .fit).padding(12)
                 }
             }
             .frame(width: ShelfMetrics.tile.width, height: ShelfMetrics.previewHeight)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
-            )
+            .shadow(color: dark ? Color.black.opacity(0.35) : Color.black.opacity(hovering ? 0.2 : 0.12),
+                    radius: hovering ? 7 : 5, x: 0, y: hovering ? 4 : 2.5)
 
             Text(item.displayName)
-                .font(.system(size: 10.5)).foregroundStyle(.secondary)
-                .lineLimit(1).truncationMode(.middle)
-                .frame(width: ShelfMetrics.tile.width)
+                .font(.system(size: 10.5, weight: .medium)).foregroundStyle(.secondary)
+                .lineLimit(2).multilineTextAlignment(.center).truncationMode(.middle)
+                .frame(width: ShelfMetrics.tile.width + 4, height: 26, alignment: .top)
         }
         .frame(width: ShelfMetrics.tile.width, height: ShelfMetrics.tile.height)
-        .scaleEffect(hovering ? 1.04 : 1.0)
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .scaleEffect(hovering ? 1.05 : 1.0)
+        .animation(.easeOut(duration: 0.13), value: hovering)
         .contentShape(Rectangle())
         // Whole tile is the AppKit handle: left-drag = drag file out, right-click = menu, hover = lift.
         .overlay(FileDragHandle(url: item.url, onRemove: onRemove, onHoverChange: { hovering = $0 }))
@@ -232,7 +259,6 @@ enum ThumbnailLoader {
         if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 25_000_000 {
             return nil
         }
-        // Read bytes off the main thread (Data is Sendable), build the image on the main actor.
         let data = await Task.detached(priority: .utility) { try? Data(contentsOf: url) }.value
         return data.flatMap(NSImage.init(data:))
     }
