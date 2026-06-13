@@ -33,6 +33,10 @@ struct ShelfDrawerContent: View {
             header
             Divider().opacity(0.3)
             content
+            if !store.isEmpty {
+                Divider().opacity(0.3)
+                footer
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
@@ -42,44 +46,62 @@ struct ShelfDrawerContent: View {
                                lineWidth: targeted ? 2 : 1)
         )
         .animation(.easeOut(duration: 0.15), value: targeted)
+        .animation(.spring(response: 0.3, dampingFraction: 0.74), value: store.isEmpty)
         .onDrop(of: [UTType.fileURL], isTargeted: $targeted) { providers in handleDrop(providers) }
     }
 
     private var header: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "tray.full.fill").font(.system(size: 11)).foregroundStyle(.secondary)
-            Text("Shelf").font(.system(size: 12.5, weight: .semibold)).foregroundStyle(.primary.opacity(0.9))
-            if !store.isEmpty {
-                Text("\(store.count)")
-                    .font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
-                    .padding(.horizontal, 6).padding(.vertical, 1.5)
-                    .background(Capsule().fill(Color.primary.opacity(0.10)))
-                    .transition(.scale.combined(with: .opacity))
+        HStack(spacing: 11) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.accentColor.gradient)
+                Image(systemName: "tray.full.fill").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
+            }
+            .frame(width: 32, height: 32)
+            .shadow(color: Color.accentColor.opacity(0.35), radius: 5, y: 2)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Shelf").font(.system(size: 14.5, weight: .bold))
+                Text(store.isEmpty ? "Empty" : "\(store.count) file\(store.count == 1 ? "" : "s")")
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
             }
             Spacer()
             if !store.isEmpty {
-                Button(action: onClear) { Image(systemName: "trash") }
-                    .buttonStyle(.plain).foregroundStyle(.secondary).help("Clear all")
+                CircleIconButton(symbol: "trash", help: "Clear all", action: onClear)
             }
-            Button(action: onClose) { Image(systemName: "xmark") }
-                .buttonStyle(.plain).foregroundStyle(.secondary).help("Hide")
+            CircleIconButton(symbol: "xmark", help: "Hide", action: onClose)
         }
-        .font(.system(size: 11))
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .frame(height: ShelfMetrics.headerHeight)
-        .animation(.spring(response: 0.3, dampingFraction: 0.72), value: store.isEmpty)
+    }
+
+    private var footer: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "hand.draw").font(.system(size: 9))
+            Text("Drag a tile out · right-click for options").font(.system(size: 9.5, weight: .medium))
+        }
+        .foregroundStyle(.tertiary)
+        .frame(height: ShelfMetrics.footerHeight)
     }
 
     @ViewBuilder
     private var content: some View {
         if store.isEmpty {
-            VStack(spacing: 7) {
-                Image(systemName: "tray.and.arrow.down").font(.system(size: 26)).foregroundStyle(.tertiary)
-                Text("Drag files here").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
-                Text("then drag them back out").font(.system(size: 11)).foregroundStyle(.tertiary)
+            VStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                        .foregroundStyle(targeted ? Color.accentColor : Color.secondary.opacity(0.4))
+                        .frame(width: 80, height: 64)
+                    Image(systemName: "tray.and.arrow.down")
+                        .font(.system(size: 24)).foregroundStyle(targeted ? Color.accentColor : .secondary)
+                }
+                Text("Drag files here").font(.system(size: 12.5, weight: .semibold))
+                Text("then switch windows and drag them back out")
+                    .font(.system(size: 10.5)).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(10)
+            .padding(14)
             .transition(.opacity)
         } else {
             ScrollView {
@@ -113,6 +135,28 @@ struct ShelfDrawerContent: View {
     }
 }
 
+// MARK: - Circular ghost button (header actions)
+
+private struct CircleIconButton: View {
+    let symbol: String
+    let help: String
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle().fill(Color.primary.opacity(hover ? 0.15 : 0.07)).frame(width: 26, height: 26)
+                Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .onHover { hover = $0 }
+        .animation(.easeOut(duration: 0.12), value: hover)
+    }
+}
+
 // MARK: - File tile (elevated card)
 
 private struct ShelfTileView: View {
@@ -126,36 +170,36 @@ private struct ShelfTileView: View {
     private var dark: Bool { scheme == .dark }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(LinearGradient(
-                        colors: [dark ? Color.white.opacity(0.15) : Color.white,
-                                 dark ? Color.white.opacity(0.05) : Color(white: 0.96)],
+                        colors: [dark ? Color.white.opacity(0.13) : Color.white,
+                                 dark ? Color.white.opacity(0.04) : Color(white: 0.965)],
                         startPoint: .top, endPoint: .bottom))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(dark ? Color.white.opacity(0.10) : Color.black.opacity(0.06), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(dark ? Color.white.opacity(0.09) : Color.black.opacity(0.05), lineWidth: 1)
                     )
 
                 if let thumb {
                     Image(nsImage: thumb)
                         .resizable().aspectRatio(contentMode: .fill)
-                        .frame(width: ShelfMetrics.tile.width - 12, height: ShelfMetrics.previewHeight - 12)
-                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .frame(width: ShelfMetrics.cardWidth - 16, height: ShelfMetrics.previewHeight - 16)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 } else {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
-                        .resizable().aspectRatio(contentMode: .fit).padding(12)
+                        .resizable().aspectRatio(contentMode: .fit).padding(16)
                 }
             }
-            .frame(width: ShelfMetrics.tile.width, height: ShelfMetrics.previewHeight)
-            .shadow(color: dark ? Color.black.opacity(0.35) : Color.black.opacity(hovering ? 0.2 : 0.12),
-                    radius: hovering ? 7 : 5, x: 0, y: hovering ? 4 : 2.5)
+            .frame(width: ShelfMetrics.cardWidth, height: ShelfMetrics.previewHeight)
+            .shadow(color: dark ? Color.black.opacity(0.34) : Color.black.opacity(hovering ? 0.18 : 0.11),
+                    radius: hovering ? 8 : 6, x: 0, y: hovering ? 4 : 3)
 
             Text(item.displayName)
-                .font(.system(size: 10.5, weight: .medium)).foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
                 .lineLimit(2).multilineTextAlignment(.center).truncationMode(.middle)
-                .frame(width: ShelfMetrics.tile.width + 4, height: 26, alignment: .top)
+                .frame(width: ShelfMetrics.tile.width, height: ShelfMetrics.nameHeight, alignment: .top)
         }
         .frame(width: ShelfMetrics.tile.width, height: ShelfMetrics.tile.height)
         .scaleEffect(hovering ? 1.05 : 1.0)
@@ -223,8 +267,8 @@ private final class DragSourceView: NSView, NSDraggingSource {
 
         let dragItem = NSDraggingItem(pasteboardWriter: url as NSURL)
         let icon = NSWorkspace.shared.icon(forFile: url.path)
-        icon.size = NSSize(width: 56, height: 56)
-        dragItem.setDraggingFrame(NSRect(x: bounds.midX - 28, y: bounds.midY - 28, width: 56, height: 56), contents: icon)
+        icon.size = NSSize(width: 64, height: 64)
+        dragItem.setDraggingFrame(NSRect(x: bounds.midX - 32, y: bounds.midY - 32, width: 64, height: 64), contents: icon)
         beginDraggingSession(with: [dragItem], event: event, source: self)
     }
 

@@ -27,13 +27,16 @@ enum ShelfEdge: String, CaseIterable, Identifiable {
 /// Shared geometry so the window size (computed in the controller) matches the tile grid
 /// (rendered in SwiftUI). The drawer is sized to its contents so it stays compact.
 enum ShelfMetrics {
-    static let tile = CGSize(width: 84, height: 102)   // card + 2-line name label
-    static let previewHeight: CGFloat = 68
-    static let spacing: CGFloat = 12
-    static let padding: CGFloat = 14
-    static let headerHeight: CGFloat = 38
-    static let emptyBodyHeight: CGFloat = 120
-    static let cornerRadius: CGFloat = 18
+    static let tile = CGSize(width: 108, height: 126)  // grid cell: card + 2-line name
+    static let cardWidth: CGFloat = 104                // elevated preview card (inside the cell)
+    static let previewHeight: CGFloat = 90             // card height
+    static let nameHeight: CGFloat = 28
+    static let spacing: CGFloat = 14
+    static let padding: CGFloat = 16
+    static let headerHeight: CGFloat = 56
+    static let footerHeight: CGFloat = 26
+    static let emptyBodyHeight: CGFloat = 140
+    static let cornerRadius: CGFloat = 22
 
     static func columns(for edge: ShelfEdge) -> Int {
         switch edge {
@@ -50,12 +53,14 @@ enum ShelfMetrics {
     static func windowSize(itemCount: Int, edge: ShelfEdge, maxHeight: CGFloat) -> NSSize {
         let w = width(for: edge)
         guard itemCount > 0 else {
-            return NSSize(width: w, height: headerHeight + emptyBodyHeight)
+            return NSSize(width: w, height: headerHeight + 1 + emptyBodyHeight)
         }
         let cols = columns(for: edge)
         let rows = max(1, Int(ceil(Double(itemCount) / Double(cols))))
         let gridHeight = CGFloat(rows) * tile.height + CGFloat(rows - 1) * spacing + 2 * padding
-        return NSSize(width: w, height: min(headerHeight + gridHeight, maxHeight))
+        // header + divider + grid + divider + footer
+        let total = headerHeight + 1 + gridHeight + 1 + footerHeight
+        return NSSize(width: w, height: min(total, maxHeight))
     }
 }
 
