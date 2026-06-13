@@ -24,6 +24,39 @@ enum ShelfEdge: String, CaseIterable, Identifiable {
     }
 }
 
+/// Shared geometry so the window size (computed in the controller) matches the tile grid
+/// (rendered in SwiftUI). The drawer is sized to its contents so it stays compact.
+enum ShelfMetrics {
+    static let tile = CGSize(width: 78, height: 94)   // thumbnail + name label
+    static let spacing: CGFloat = 10
+    static let padding: CGFloat = 12
+    static let headerHeight: CGFloat = 34
+    static let emptyBodyHeight: CGFloat = 104
+
+    static func columns(for edge: ShelfEdge) -> Int {
+        switch edge {
+        case .left, .right: return 2
+        case .top, .bottom: return 4
+        }
+    }
+
+    static func width(for edge: ShelfEdge) -> CGFloat {
+        let c = CGFloat(columns(for: edge))
+        return c * tile.width + (c - 1) * spacing + 2 * padding
+    }
+
+    static func windowSize(itemCount: Int, edge: ShelfEdge, maxHeight: CGFloat) -> NSSize {
+        let w = width(for: edge)
+        guard itemCount > 0 else {
+            return NSSize(width: w, height: headerHeight + emptyBodyHeight)
+        }
+        let cols = columns(for: edge)
+        let rows = max(1, Int(ceil(Double(itemCount) / Double(cols))))
+        let gridHeight = CGFloat(rows) * tile.height + CGFloat(rows - 1) * spacing + 2 * padding
+        return NSSize(width: w, height: min(headerHeight + gridHeight, maxHeight))
+    }
+}
+
 /// Holds the shelf's files. Items are kept by reference (the app isn't sandboxed), so dragging one
 /// back out vends the original file URL.
 @MainActor

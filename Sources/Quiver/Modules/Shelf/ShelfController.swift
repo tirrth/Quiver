@@ -4,8 +4,9 @@ import QuartzCore
 import SwiftUI
 
 /// Owns the shelf drawer window and the global drag-watcher that slides it out when you start
-/// dragging files. The drawer is a borderless, non-movable panel anchored to a screen edge; its
-/// rows are native AppKit drag sources (so dragging a file out can't move the window).
+/// dragging files. The drawer is a borderless, non-movable panel anchored to a screen edge, sized
+/// to its contents; its tiles are native AppKit drag sources (so dragging a file out can't move
+/// the window).
 @MainActor
 final class ShelfController: NSObject {
     let store = ShelfStore()
@@ -23,7 +24,6 @@ final class ShelfController: NSObject {
     private var active = false
     private var baselineDragChangeCount = 0
     private var poppedThisGesture = false
-    /// True when the drawer was auto-popped by a drag and nothing has been dropped yet.
     private var autoShown = false
 
     // MARK: Settings
@@ -38,7 +38,11 @@ final class ShelfController: NSObject {
     func setEdge(_ e: ShelfEdge) {
         edge = e
         UserDefaults.standard.set(e.rawValue, forKey: "\(defaultsPrefix).edge")
-        if drawerWindow?.isVisible == true { showDrawer() }   // re-anchor live
+        // Column count/width depend on the edge, so rebuild the window with the new layout.
+        let wasVisible = drawerWindow?.isVisible == true
+        drawerWindow?.orderOut(nil)
+        drawerWindow = nil
+        if wasVisible { showDrawer() }
     }
 
     func setAutoPop(_ value: Bool) {
@@ -52,7 +56,9 @@ final class ShelfController: NSObject {
         active = true
         installMonitors()
         storeCancellable = store.$items.sink { [weak self] items in
-            if !items.isEmpty { self?.autoShown = false }   // shelf has content → keep it sticky
+            guard let self else { return }
+            if !items.isEmpty { self.autoShown = false }   // shelf has content → keep it sticky
+            self.relayoutIfVisible()
         }
     }
 
@@ -102,8 +108,7 @@ final class ShelfController: NSObject {
     private func handleDrag() {
         guard active, autoPop, !poppedThisGesture, drawerWindow?.isVisible != true else { return }
         // A real drag-and-drop session bumps the drag pasteboard's change count after mouse-down;
-        // plain window-dragging or text selection does not. This distinguishes "dragging files"
-        // from "dragging something else" without false pops from stale pasteboard data.
+        // plain window-dragging or text selection does not — this avoids false pops.
         let current = NSPasteboard(name: .drag).changeCount
         guard current != baselineDragChangeCount, dragHasFiles() else { return }
         poppedThisGesture = true
@@ -127,7 +132,6 @@ final class ShelfController: NSObject {
 
     // MARK: Show / hide
 
-    /// Deliberate open (from the menu): sticky, won't auto-hide when empty.
     func openShelf(forceVisible: Bool) {
         if forceVisible { autoShown = false }
         showDrawer()
@@ -136,16 +140,15 @@ final class ShelfController: NSObject {
     private func showDrawer() {
         hideWorkItem?.cancel()
         let screen = screenUnderMouse()
-        let size = drawerSize(for: edge)
+        let size = ShelfMetrics.windowSize(itemCount: store.count, edge: edge, maxHeight: screen.visibleFrame.height * 0.8)
         let onFrame = drawerFrame(on: screen, edge: edge, size: size)
         let window = ensureWindow()
 
         if window.isVisible {
-            window.setFrame(onFrame, display: true, animate: true)   // re-anchor (e.g. screen/edge change)
+            window.setFrame(onFrame, display: true, animate: true)
             return
         }
 
-        // Slide in from just off the edge.
         let offFrame = offscreenFrame(from: onFrame, edge: edge)
         window.setFrame(offFrame, display: false)
         window.alphaValue = 0
@@ -175,6 +178,19 @@ final class ShelfController: NSObject {
         })
     }
 
+    /// Re-size and re-anchor the drawer to fit its contents (called as items are added/removed).
+    private func relayoutIfVisible() {
+        guard let window = drawerWindow, window.isVisible else { return }
+        let screen = window.screen ?? screenUnderMouse()
+        let size = ShelfMetrics.windowSize(itemCount: store.count, edge: edge, maxHeight: screen.visibleFrame.height * 0.8)
+        let onFrame = drawerFrame(on: screen, edge: edge, size: size)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.15
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            window.animator().setFrame(onFrame, display: true)
+        }
+    }
+
     private func scheduleAutoHide() {
         hideWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in
@@ -189,8 +205,9 @@ final class ShelfController: NSObject {
 
     private func ensureWindow() -> NSPanel {
         if let drawerWindow { return drawerWindow }
+        let initial = ShelfMetrics.windowSize(itemCount: 0, edge: edge, maxHeight: 800)
         let window = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 250, height: 380),
+            contentRect: NSRect(origin: .zero, size: initial),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -208,6 +225,7 @@ final class ShelfController: NSObject {
         let host = NSHostingController(
             rootView: ShelfDrawerContent(
                 store: store,
+                columns: ShelfMetrics.columns(for: edge),
                 onClear: { [weak self] in self?.store.clear() },
                 onClose: { [weak self] in self?.hideDrawer() }
             )
@@ -226,29 +244,24 @@ final class ShelfController: NSObject {
             ?? NSScreen.screens[0]
     }
 
-    private func drawerSize(for edge: ShelfEdge) -> NSSize {
-        switch edge {
-        case .left, .right: return NSSize(width: 250, height: 380)
-        case .top, .bottom: return NSSize(width: 380, height: 240)
-        }
-    }
-
     private func drawerFrame(on screen: NSScreen, edge: ShelfEdge, size: NSSize) -> NSRect {
         let vf = screen.visibleFrame
+        let margin: CGFloat = 8
         switch edge {
-        case .right:  return NSRect(x: vf.maxX - size.width,      y: vf.midY - size.height / 2, width: size.width, height: size.height)
-        case .left:   return NSRect(x: vf.minX,                    y: vf.midY - size.height / 2, width: size.width, height: size.height)
-        case .top:    return NSRect(x: vf.midX - size.width / 2,  y: vf.maxY - size.height,      width: size.width, height: size.height)
-        case .bottom: return NSRect(x: vf.midX - size.width / 2,  y: vf.minY,                    width: size.width, height: size.height)
+        case .right:  return NSRect(x: vf.maxX - size.width - margin, y: vf.midY - size.height / 2, width: size.width, height: size.height)
+        case .left:   return NSRect(x: vf.minX + margin,              y: vf.midY - size.height / 2, width: size.width, height: size.height)
+        case .top:    return NSRect(x: vf.midX - size.width / 2,      y: vf.maxY - size.height - margin, width: size.width, height: size.height)
+        case .bottom: return NSRect(x: vf.midX - size.width / 2,      y: vf.minY + margin,           width: size.width, height: size.height)
         }
     }
 
     private func offscreenFrame(from frame: NSRect, edge: ShelfEdge) -> NSRect {
+        let pad: CGFloat = 24
         switch edge {
-        case .right:  return frame.offsetBy(dx: frame.width, dy: 0)
-        case .left:   return frame.offsetBy(dx: -frame.width, dy: 0)
-        case .top:    return frame.offsetBy(dx: 0, dy: frame.height)
-        case .bottom: return frame.offsetBy(dx: 0, dy: -frame.height)
+        case .right:  return frame.offsetBy(dx: frame.width + pad, dy: 0)
+        case .left:   return frame.offsetBy(dx: -(frame.width + pad), dy: 0)
+        case .top:    return frame.offsetBy(dx: 0, dy: frame.height + pad)
+        case .bottom: return frame.offsetBy(dx: 0, dy: -(frame.height + pad))
         }
     }
 }
