@@ -1,0 +1,15 @@
+# Build artifacts
+build/
+*.app
+*.dmg
+*.o
+*.dSYM/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+.idea/
+.vscode/
