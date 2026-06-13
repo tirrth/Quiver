@@ -253,10 +253,17 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(hideOthers)
         appMenu.addItem(.separator())
-        let closeToBar = NSMenuItem(title: "Close to Menu Bar", action: #selector(hideToMenuBarFromMenu), keyEquivalent: "w")
+        // ⌘W and ⌘Q both just close the window to the menu bar — Quiver keeps running in the
+        // background. A full quit is deliberate: ⌘⇧Q here, or the menu-bar popover's Quit button.
+        let closeWindow = NSMenuItem(title: "Close Window", action: #selector(hideToMenuBarFromMenu), keyEquivalent: "w")
+        closeWindow.target = self
+        appMenu.addItem(closeWindow)
+        let closeToBar = NSMenuItem(title: "Close to Menu Bar", action: #selector(hideToMenuBarFromMenu), keyEquivalent: "q")
         closeToBar.target = self
         appMenu.addItem(closeToBar)
+        appMenu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Quit Quiver", action: #selector(quitCompletely), keyEquivalent: "q")
+        quitItem.keyEquivalentModifierMask = [.command, .shift]
         quitItem.target = self
         appMenu.addItem(quitItem)
 
