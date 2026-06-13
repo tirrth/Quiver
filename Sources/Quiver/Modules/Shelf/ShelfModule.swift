@@ -10,16 +10,16 @@ struct ShelfItem: Identifiable, Equatable {
     static func == (lhs: ShelfItem, rhs: ShelfItem) -> Bool { lhs.url == rhs.url }
 }
 
-/// Which screen corner the shelf slides in from.
-enum ShelfCorner: String, CaseIterable, Identifiable {
-    case topRight, topLeft, bottomRight, bottomLeft
+/// Which screen edge the shelf drawer slides out from.
+enum ShelfEdge: String, CaseIterable, Identifiable {
+    case right, left, top, bottom
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .topRight: return "Top right"
-        case .topLeft: return "Top left"
-        case .bottomRight: return "Bottom right"
-        case .bottomLeft: return "Bottom left"
+        case .right: return "Right"
+        case .left: return "Left"
+        case .top: return "Top"
+        case .bottom: return "Bottom"
         }
     }
 }
