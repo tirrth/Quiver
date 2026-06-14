@@ -1,7 +1,7 @@
 import Foundation
 import Carbon.HIToolbox
 
-/// One window arrangement Anchor can perform, with its menu metadata and default global shortcut.
+/// One window arrangement Snap To can perform, with its menu metadata and default global shortcut.
 enum WindowAction: String, CaseIterable, Identifiable {
     case leftHalf, rightHalf, topHalf, bottomHalf
     case topLeft, topRight, bottomLeft, bottomRight

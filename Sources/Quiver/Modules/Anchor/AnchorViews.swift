@@ -1,7 +1,7 @@
 import SwiftUI
 import Carbon.HIToolbox
 
-/// Anchor's settings pane: click-to-arrange buttons, a gap picker, and an editable shortcut list.
+/// Snap To's settings pane: click-to-arrange buttons, a gap picker, and an editable shortcut list.
 struct AnchorSettingsView: View {
     @ObservedObject var module: AnchorModule
     @StateObject private var recorder = KeyRecorder()

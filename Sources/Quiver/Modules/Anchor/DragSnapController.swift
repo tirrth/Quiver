@@ -52,7 +52,7 @@ final class DragSnapController {
                 return Unmanaged.passUnretained(event)
             },
             userInfo: selfPtr
-        ) else { Log.error("Anchor: could not create the drag-snap event tap"); return }
+        ) else { Log.error("Snap To: could not create the drag-snap event tap"); return }
 
         self.tap = tap
         runLoopSource = CFMachPortCreateRunLoopSource(nil, tap, 0)

@@ -4,7 +4,7 @@ import SwiftUI
 /// A per-action shortcut override: explicitly unbound, or a custom combo. Absence means "use default".
 private enum ShortcutOverride { case cleared; case custom(Shortcut) }
 
-/// Anchor: snap the frontmost window to halves, quarters, maximize, or centre — via global keyboard
+/// Snap To: arrange the frontmost window to halves, quarters, maximize, or centre — via global keyboard
 /// shortcuts or the buttons in its settings pane. Reuses the Accessibility permission shared with
 /// Follow Focus. Toggling the module on/off enables/disables the global shortcuts.
 @MainActor
@@ -39,7 +39,7 @@ final class AnchorModule: UtilityModule {
         lastTrusted = AutoRaiseEngine.isAccessibilityTrusted()
         super.init(
             id: "anchor",
-            title: "Anchor",
+            title: "Snap To",
             subtitle: "Snap the front window to halves, quarters, maximize, or centre — by click or keyboard shortcut.",
             symbolName: "rectangle.split.2x2"
         )
@@ -186,7 +186,7 @@ final class AnchorModule: UtilityModule {
     override var permission: PermissionState {
         AutoRaiseEngine.isAccessibilityTrusted()
             ? .ok
-            : .needed(reason: "Anchor needs Accessibility access to move and resize windows.",
+            : .needed(reason: "Snap To needs Accessibility access to move and resize windows.",
                       actionTitle: "Grant Access")
     }
 

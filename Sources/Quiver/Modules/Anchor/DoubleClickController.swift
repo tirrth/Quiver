@@ -31,7 +31,7 @@ final class DoubleClickController {
                 return MainActor.assumeIsolated { c.handle(type: type, event: event) }
             },
             userInfo: selfPtr
-        ) else { Log.error("Anchor: could not create the double-click event tap"); return }
+        ) else { Log.error("Snap To: could not create the double-click event tap"); return }
 
         self.tap = tap
         runLoopSource = CFMachPortCreateRunLoopSource(nil, tap, 0)
