@@ -55,10 +55,13 @@ final class ShelfController: NSObject {
     func start() {
         active = true
         installMonitors()
-        storeCancellable = store.$items.sink { [weak self] items in
-            guard let self else { return }
-            if !items.isEmpty { self.autoShown = false }   // shelf has content → keep it sticky
-            self.relayoutIfVisible()
+        storeCancellable = store.objectWillChange.sink { [weak self] _ in
+            // objectWillChange fires *before* the mutation, so read the new state next tick.
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if !self.store.isEmpty { self.autoShown = false }   // active shelf has content → keep it sticky
+                self.relayoutIfVisible()
+            }
         }
     }
 
@@ -67,7 +70,7 @@ final class ShelfController: NSObject {
         removeMonitors()
         storeCancellable = nil
         hideDrawer(animated: false)
-        store.clear()
+        // Keep the items: the shelf is persisted and should survive disabling/relaunch.
     }
 
     private func installMonitors() {

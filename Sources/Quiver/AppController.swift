@@ -63,6 +63,13 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         updateStatusButton()
         startPermissionTimer()
 
+        // Register the system-wide "Add to Quiver Shelf" Service so it appears in any app's right-click
+        // → Services menu (the user may need to enable it in System Settings ▸ Keyboard ▸ Services).
+        if let shelf = manager.module(id: "shelf") as? ShelfModule {
+            NSApp.servicesProvider = shelf.serviceProvider
+            NSUpdateDynamicServices()
+        }
+
         if launchesInBackground {
             NSApp.setActivationPolicy(.accessory)
         } else {

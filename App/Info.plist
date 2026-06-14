@@ -34,5 +34,27 @@
     <string>Quiver's Mirror lets you quickly check your webcam before a meeting.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>Add to Quiver Shelf</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>addToShelf</string>
+            <key>NSPortName</key>
+            <string>Quiver</string>
+            <key>NSSendTypes</key>
+            <array>
+                <string>public.file-url</string>
+                <string>public.url</string>
+                <string>public.plain-text</string>
+                <string>NSStringPboardType</string>
+                <string>NSFilenamesPboardType</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
