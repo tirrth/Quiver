@@ -84,7 +84,9 @@ final class MenuBarPopover: NSObject, NSWindowDelegate {
             panel.animator().alphaValue = 1
         }
 
-        button.highlight(true)
+        // Defer past the status button's own click cycle, which would otherwise immediately
+        // un-highlight it (the click that opened the popover finishes after this method returns).
+        DispatchQueue.main.async { [weak button] in button?.highlight(true) }
         isShown = true
         installHooks()
     }
