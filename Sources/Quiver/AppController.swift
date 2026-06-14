@@ -2,6 +2,15 @@ import AppKit
 import Combine
 import SwiftUI
 
+/// Hosts the hub's SwiftUI content but opts out of the NSMenu's vibrancy. An NSMenu renders its content
+/// in a vibrant material context, which forces child controls to be vibrant and desaturates their
+/// colors (an "on" switch renders white instead of accent, non-deterministically per draw). Returning
+/// false from `allowsVibrancy` is the documented way for a subview of a visual-effect view to stop
+/// vibrancy, so the hub's controls draw with their true colors.
+private final class NonVibrantHostingView<Content: View>: NSHostingView<Content> {
+    override var allowsVibrancy: Bool { false }
+}
+
 /// The application shell: owns the menu-bar status item, the hub popover, the main window, the
 /// settings window, and app lifecycle. Generalized from HostsMachine's AppController so it drives
 /// an arbitrary set of `UtilityModule`s instead of one hard-coded feature.
@@ -171,7 +180,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         let menu = NSMenu()
         let item = NSMenuItem()
-        let hosting = NSHostingView(rootView: HubPopoverView(
+        let hosting = NonVibrantHostingView(rootView: HubPopoverView(
             manager: manager,
             settings: settings,
             onOpenApp: { [weak self] in self?.dismissHubMenu { self?.showMainWindow() } },
