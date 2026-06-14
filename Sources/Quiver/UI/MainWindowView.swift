@@ -99,7 +99,6 @@ struct ModuleDetailView: View {
                         Toggle("", isOn: isOn)
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.large)
                             .disabled(module.permission.unavailableReason != nil)
                     }
                 }
