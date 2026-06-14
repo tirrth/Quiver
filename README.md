@@ -1,5 +1,9 @@
 # Quiver
 
+[![Download for macOS](https://img.shields.io/github/v/release/tirrth/Quiver?label=Download%20for%20macOS&logo=apple&logoColor=white&color=2563eb)](https://github.com/tirrth/Quiver/releases/latest)
+
+**[⬇ Download the latest release](https://github.com/tirrth/Quiver/releases/latest)** (macOS 13+). Open the `.dmg` and drag Quiver into Applications. First launch needs a one-time approval ([details below](#download)).
+
 A single macOS menu-bar app that holds a quiver of small utilities you flip on and off
 individually. It lives in the menu bar, runs quietly in the background, and can launch at login.
 
@@ -23,6 +27,28 @@ One app, several focused tools — instead of a separate menu-bar app for every 
 - **Launch at login** — optionally start hidden in the menu bar.
 - **Remembers everything** — which utilities are on and each utility's settings persist across restarts; enabled utilities auto-start on launch.
 - **Single instance**, About panel, verbose-logging toggle, and clear permission prompts with deep links to System Settings.
+
+## Download
+
+The easiest way to get Quiver: grab the latest **`Quiver.dmg`** from the
+[**Releases**](https://github.com/tirrth/Quiver/releases/latest) page, open it, and drag **Quiver**
+into your **Applications** folder.
+
+Quiver isn't notarized by Apple yet, so the first time you launch it macOS will warn that it's from an
+unidentified developer. To allow it (a one-time step):
+
+1. Double-click **Quiver** once, then dismiss the warning.
+2. Open **System Settings → Privacy & Security**, scroll to the bottom, and click **Open Anyway** next
+   to the message about Quiver, then confirm with **Open**.
+
+On older macOS you can instead **Control-click Quiver → Open**. If macOS instead says the app is
+"damaged", clear the download quarantine once with:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Quiver.app
+```
+
+Prefer to build it yourself? See below.
 
 ## Build & install
 
