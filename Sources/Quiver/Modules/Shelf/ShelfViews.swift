@@ -77,7 +77,7 @@ struct ShelfDrawerContent: View {
             .shadow(color: Color.accentColor.opacity(0.35), radius: 5, y: 2)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Shelf").font(.system(size: 14.5, weight: .bold))
+                Text("Drop Deck").font(.system(size: 14.5, weight: .bold))
                 Text(store.isEmpty ? "Empty" : "\(store.totalItems) file\(store.totalItems == 1 ? "" : "s")")
                     .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
             }
@@ -265,7 +265,7 @@ private struct ShelfActionsMenu: View {
         .menuIndicator(.hidden)
         .frame(width: 26, height: 26)
         .onHover { hover = $0 }
-        .help("Shelf actions")
+        .help("Drop Deck actions")
     }
 }
 
@@ -533,7 +533,7 @@ private final class DragSourceView: NSView, NSDraggingSource {
         if !fileURLs.isEmpty { add(menu, g ? "Reveal All in Finder" : "Reveal in Finder", #selector(revealItems)) }
         if g, onUngroup != nil { add(menu, "Ungroup", #selector(ungroupItems)) }
         menu.addItem(.separator())
-        add(menu, g ? "Remove Group" : "Remove from Shelf", #selector(removeItems))
+        add(menu, g ? "Remove Group" : "Remove from Drop Deck", #selector(removeItems))
         return menu
     }
     private func add(_ menu: NSMenu, _ title: String, _ action: Selector) {
@@ -597,7 +597,7 @@ struct ShelfQuickControls: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Button { module.openShelf() } label: { Label("Open shelf", systemImage: "tray.full") }
+            Button { module.openShelf() } label: { Label("Open Drop Deck", systemImage: "tray.full") }
                 .controlSize(.small)
             Spacer()
             Text(module.controller.store.isEmpty ? "empty" : "\(module.controller.store.totalItems) held")
@@ -616,7 +616,7 @@ struct ShelfSettingsView: View {
             Card(title: "Behavior") {
                 SettingRow(
                     title: "Pop out when I start dragging files",
-                    subtitle: "The shelf slides out automatically as soon as you begin dragging files. Turn off to open it only from the menu."
+                    subtitle: "Drop Deck slides out automatically as soon as you begin dragging files. Turn off to open it only from the menu."
                 ) {
                     Toggle("", isOn: Binding(
                         get: { module.controller.autoPop },
@@ -628,7 +628,7 @@ struct ShelfSettingsView: View {
 
                 SettingRow(
                     title: "Move files out instead of copying",
-                    subtitle: "When you drag a file off the shelf, move the original to the destination (and drop it from the shelf) instead of leaving a copy behind. Text and links are always copied."
+                    subtitle: "When you drag a file off the deck, move the original to the destination (and remove it from the deck) instead of leaving a copy behind. Text and links are always copied."
                 ) {
                     Toggle("", isOn: Binding(
                         get: { UserDefaults.standard.bool(forKey: "module.shelf.moveOnDrag") },
@@ -640,7 +640,7 @@ struct ShelfSettingsView: View {
 
                 SettingRow(
                     title: "Slides out from",
-                    subtitle: "Which screen edge the shelf drawer appears from (on whichever display your pointer is on)."
+                    subtitle: "Which screen edge the deck appears from (on whichever display your pointer is on)."
                 ) {
                     Picker("", selection: Binding(
                         get: { module.controller.edge },
@@ -654,14 +654,14 @@ struct ShelfSettingsView: View {
                 }
             }
 
-            Card(title: "Shelf") {
+            Card(title: "Drop Deck") {
                 HStack {
-                    Button { module.openShelf() } label: { Label("Open shelf now", systemImage: "tray.full") }
+                    Button { module.openShelf() } label: { Label("Open Drop Deck now", systemImage: "tray.full") }
                     Spacer()
                     Text(module.controller.store.isEmpty ? "Empty" : "\(module.controller.store.totalItems) item(s)")
                         .foregroundStyle(.secondary)
                 }
-                Text("Drop files on the shelf, then drag a tile back out to move/copy it. Right-click a tile to remove it or reveal it in Finder. The drawer floats above everything and follows you across Spaces.")
+                Text("Drop files on the deck, then drag a tile back out to move/copy it. Right-click a tile to remove it or reveal it in Finder. The drawer floats above everything and follows you across Spaces.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

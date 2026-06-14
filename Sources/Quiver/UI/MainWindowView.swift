@@ -33,7 +33,7 @@ struct MainWindowView: View {
                         .tag(SidebarSelection.general)
                 }
                 Section("Utilities") {
-                    ForEach(manager.modules) { module in
+                    ForEach(manager.orderedModules) { module in
                         SidebarModuleLabel(module: module)
                             .tag(SidebarSelection.module(module.id))
                     }

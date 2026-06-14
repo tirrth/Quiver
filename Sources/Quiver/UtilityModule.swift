@@ -28,7 +28,7 @@ class UtilityModule: ObservableObject, Identifiable {
     /// SF Symbol shown in the menu and sidebar.
     let symbolName: String
 
-    /// `true` for background utilities with an on/off engine (AutoRaise, KeepAwake). `false` for
+    /// `true` for background utilities with an on/off engine (Follow Focus, Keep Awake). `false` for
     /// "tool" utilities you simply open and use (Hosts), which show an Open affordance instead of a
     /// switch and surface their controls without an enabled gate.
     let isToggleable: Bool
@@ -97,7 +97,7 @@ class UtilityModule: ObservableObject, Identifiable {
     }
 
     /// Called periodically by the shell (≈ every 2s). Override to re-check OS permissions or
-    /// external state (e.g. AutoRaise watching for Accessibility to be granted).
+    /// external state (e.g. Follow Focus watching for Accessibility to be granted).
     func periodicRefresh() {}
 
     // MARK: Persistence helpers

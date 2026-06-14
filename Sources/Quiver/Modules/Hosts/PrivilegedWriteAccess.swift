@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-// Ported from HostsMachine, rebranded to Quiver.
+// Privileged write access to /etc/hosts via a small helper tool.
 enum PrivilegedCommandRunner {
     static func runWithAdministratorPrivileges(_ command: String) throws {
         let scriptSource = "do shell script \"\(appleScriptEscaped(command))\" with administrator privileges"

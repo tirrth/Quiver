@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-// Ported from HostsMachine: parses, rewrites, and privileged-writes /etc/hosts.
+// Parses, rewrites, and privileged-writes /etc/hosts.
 enum HostsFileService {
     static let hostsURL = URL(fileURLWithPath: "/etc/hosts")
 

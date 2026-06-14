@@ -3,8 +3,7 @@ import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// What a shelf item holds. The shelf isn't just files anymore — like Dropover it can also keep
-/// dropped/added text snippets, links, and images.
+/// What a Drop Deck item holds — files, plus dropped text snippets, links, and images.
 enum ShelfItemKind: String, Codable { case file, image, text, link }
 
 /// One item held on the shelf — a file, an image, a text snippet, or a link.
@@ -234,7 +233,7 @@ final class ShelfStore: ObservableObject {
         guard !files.isEmpty else { return }
         let dir = ShelfStorage.dir
         Task.detached(priority: .userInitiated) {
-            let zipURL = dir.appendingPathComponent("Shelf-\(Int(Date().timeIntervalSince1970)).zip")
+            let zipURL = dir.appendingPathComponent("Deck-\(Int(Date().timeIntervalSince1970)).zip")
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
             proc.arguments = ["-j", "-q", zipURL.path] + files.map(\.path)   // -j flattens paths
@@ -252,8 +251,8 @@ final class ShelfStore: ObservableObject {
     }
 }
 
-/// "Drag shelf" utility: a floating tray you drop files onto so you can switch windows/Spaces and
-/// then drag them back out wherever you want (like Yoink / Dropover).
+/// Drag-and-drop deck utility: a floating tray you drop files onto so you can switch windows/Spaces and
+/// then drag them back out wherever you want.
 @MainActor
 final class ShelfModule: UtilityModule {
     let controller = ShelfController()
@@ -263,7 +262,7 @@ final class ShelfModule: UtilityModule {
     init() {
         super.init(
             id: "shelf",
-            title: "Shelf",
+            title: "Drop Deck",
             subtitle: "A floating tray for dragging files: drop them here, switch windows or Spaces, then drag them back out wherever you want.",
             symbolName: "tray.full"
         )
@@ -297,7 +296,7 @@ final class ShelfModule: UtilityModule {
     }
 }
 
-/// Backs the system-wide "Add to Quiver Shelf" Service (right-click → Services in any app). Declared
+/// Backs the system-wide "Add to Quiver Drop Deck" Service (right-click → Services in any app). Declared
 /// in Info.plist (NSServices → addToShelf) and registered as `NSApp.servicesProvider` at launch.
 final class ShelfServiceProvider: NSObject {
     weak var store: ShelfStore?

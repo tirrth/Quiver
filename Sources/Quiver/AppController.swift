@@ -12,7 +12,7 @@ private final class NonVibrantHostingView<Content: View>: NSHostingView<Content>
 }
 
 /// The application shell: owns the menu-bar status item, the hub popover, the main window, the
-/// settings window, and app lifecycle. Generalized from HostsMachine's AppController so it drives
+/// settings window, and app lifecycle. It drives
 /// an arbitrary set of `UtilityModule`s instead of one hard-coded feature.
 @MainActor
 final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -63,7 +63,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         updateStatusButton()
         startPermissionTimer()
 
-        // Register the system-wide "Add to Quiver Shelf" Service so it appears in any app's right-click
+        // Register the system-wide "Add to Quiver Drop Deck" Service so it appears in any app's right-click
         // → Services menu (the user may need to enable it in System Settings ▸ Keyboard ▸ Services).
         if let shelf = manager.module(id: "shelf") as? ShelfModule {
             NSApp.servicesProvider = shelf.serviceProvider
@@ -310,22 +310,41 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // MARK: Status item appearance
 
+    /// Quiver's mark: a bold archery arrow (matching the app icon). Drawn in a `flipped:false`
+    /// coordinate space (y-up) so it can be reused for both the app icon and this glyph.
+    static func arrowGlyphPath(_ S: CGFloat) -> CGPath {
+        let cx = S / 2, sw = S * 0.105
+        let yNock = S * 0.12, yTip = S * 0.88, yHeadBase = S * 0.60, hw = S * 0.205
+        let p = CGMutablePath()
+        p.addRoundedRect(in: CGRect(x: cx - sw / 2, y: yNock, width: sw, height: yHeadBase - yNock + S * 0.03),
+                         cornerWidth: sw / 2, cornerHeight: sw / 2)
+        let head = CGMutablePath()
+        head.move(to: CGPoint(x: cx, y: yTip))
+        head.addLine(to: CGPoint(x: cx - hw, y: yHeadBase))
+        head.addLine(to: CGPoint(x: cx + hw, y: yHeadBase)); head.closeSubpath()
+        p.addPath(head)
+        for s in [CGFloat(-1), 1] {
+            let inX = cx + s * sw * 0.30
+            let f = CGMutablePath()
+            f.move(to: CGPoint(x: inX, y: yNock + S * 0.33))
+            f.addLine(to: CGPoint(x: cx + s * (sw * 0.30 + S * 0.165), y: yNock + S * 0.15))
+            f.addLine(to: CGPoint(x: cx + s * (sw * 0.30 + S * 0.165), y: yNock - S * 0.01))
+            f.addLine(to: CGPoint(x: inX, y: yNock + S * 0.07)); f.closeSubpath()
+            p.addPath(f)
+        }
+        return p
+    }
+
+    // A template image redrawn per display scale (crisp on Retina), recolored by the system.
     private static let statusImage: NSImage = {
-        let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        if let image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Quiver")?
-            .withSymbolConfiguration(config) {
-            image.isTemplate = true
-            return image
+        let pt: CGFloat = 18
+        let image = NSImage(size: NSSize(width: pt, height: pt), flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            ctx.addPath(arrowGlyphPath(rect.width))
+            ctx.setFillColor(NSColor.black.cgColor)
+            ctx.fillPath()
+            return true
         }
-        // Fallback: a simple drawn glyph.
-        let size = NSSize(width: 18, height: 18)
-        let image = NSImage(size: size)
-        image.lockFocus()
-        NSColor.labelColor.setFill()
-        for y: CGFloat in [3.5, 8.5, 13.5] {
-            NSBezierPath(roundedRect: NSRect(x: 2, y: y - 1, width: 14, height: 2), xRadius: 1, yRadius: 1).fill()
-        }
-        image.unlockFocus()
         image.isTemplate = true
         return image
     }()

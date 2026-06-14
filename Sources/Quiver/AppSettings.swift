@@ -2,7 +2,7 @@ import Foundation
 import Combine
 
 /// App-wide preferences (distinct from per-module config): launch at login, start hidden,
-/// and verbose logging. Mirrors HostsMachine's SettingsStore but trimmed to the app shell.
+/// and verbose logging. The settings store for the app shell.
 @MainActor
 final class AppSettings: ObservableObject {
     @Published private(set) var launchAtLogin: Bool

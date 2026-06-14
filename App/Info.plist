@@ -40,7 +40,7 @@
             <key>NSMenuItem</key>
             <dict>
                 <key>default</key>
-                <string>Add to Quiver Shelf</string>
+                <string>Add to Quiver Drop Deck</string>
             </dict>
             <key>NSMessage</key>
             <string>addToShelf</string>

@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// Observable state for the Hosts editor. Ported from HostsMachine. Loads /etc/hosts, applies
+/// Observable state for editing /etc/hosts. Loads /etc/hosts, applies
 /// privileged changes, and refreshes on success.
 @MainActor
 final class HostsViewModel: ObservableObject {

@@ -100,7 +100,7 @@ struct MirrorQuickControls: View {
 
     var body: some View {
         Button { module.openMirror() } label: {
-            Label(module.controller.isOpen ? "Hide Mirror" : "Open Mirror", systemImage: "camera.fill")
+            Label(module.controller.isOpen ? "Hide Glance Me" : "Open Glance Me", systemImage: "camera.fill")
         }
         .controlSize(.small)
     }
@@ -120,14 +120,14 @@ struct MirrorSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Button { module.openMirror() } label: {
-                Label(controller.isOpen ? "Hide Mirror" : "Open Mirror", systemImage: "camera.fill")
+                Label(controller.isOpen ? "Hide Glance Me" : "Open Glance Me", systemImage: "camera.fill")
             }
             .controlSize(.large).buttonStyle(.borderedProminent)
 
             Card(title: "Appearance") {
                 SettingRow(
-                    title: "Mirror image",
-                    subtitle: "Flip horizontally so it behaves like a real mirror."
+                    title: "Flip image",
+                    subtitle: "Flip horizontally so the image is not reversed."
                 ) {
                     Toggle("", isOn: Binding(get: { controller.mirrored }, set: { controller.setMirrored($0) }))
                         .labelsHidden().toggleStyle(.switch)

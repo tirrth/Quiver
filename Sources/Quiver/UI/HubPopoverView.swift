@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The menu-bar popover — compact and minimal: a tidy header, one row per utility, and a slim footer.
 struct HubPopoverView: View {
@@ -33,11 +34,14 @@ struct HubPopoverView: View {
             Divider().opacity(0.6)
 
             VStack(spacing: 1) {
-                ForEach(manager.modules) { module in
+                ForEach(manager.menuModules) { module in
                     ModuleRowView(module: module, onOpenModule: onOpenModule)
+                        .onDrag { NSItemProvider(object: module.id as NSString) }
+                        .onDrop(of: [.text], delegate: ModuleReorderDelegate(targetID: module.id, manager: manager))
                 }
             }
             .padding(.vertical, 5)
+            .animation(.spring(response: 0.3, dampingFraction: 0.82), value: manager.order)
 
             Divider().opacity(0.6)
             footer
@@ -52,7 +56,7 @@ struct HubPopoverView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "slider.horizontal.3")
+            Image(systemName: "arrowshape.up.fill")
                 .font(.system(size: 13, weight: .bold)).foregroundStyle(Color.accentColor)
             Text("Quiver").font(.system(size: 14, weight: .bold))
             Spacer()
@@ -75,6 +79,24 @@ struct HubPopoverView: View {
         .padding(.horizontal, 14)
         .frame(height: 36)
     }
+}
+
+/// Drag-and-drop reordering of module tiles — shared by the menu-bar hub and the settings list.
+struct ModuleReorderDelegate: DropDelegate {
+    let targetID: String
+    let manager: ModuleManager
+
+    func dropEntered(info: DropInfo) {
+        guard let provider = info.itemProviders(for: [.text]).first else { return }
+        _ = provider.loadObject(ofClass: NSString.self) { obj, _ in
+            guard let dragged = obj as? String, dragged != targetID else { return }
+            Task { @MainActor in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) { manager.move(dragged, before: targetID) }
+            }
+        }
+    }
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+    func performDrop(info: DropInfo) -> Bool { true }
 }
 
 private extension View {

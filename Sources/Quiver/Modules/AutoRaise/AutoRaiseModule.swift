@@ -72,7 +72,7 @@ final class AutoRaiseModule: UtilityModule {
 
         super.init(
             id: "autoraise",
-            title: "AutoRaise",
+            title: "Follow Focus",
             subtitle: "Raise and/or focus a window just by hovering over it (focus-follows-mouse).",
             symbolName: "macwindow.on.rectangle"
         )
@@ -192,7 +192,7 @@ final class AutoRaiseModule: UtilityModule {
     override var permission: PermissionState {
         AutoRaiseEngine.isAccessibilityTrusted()
             ? .ok
-            : .needed(reason: "AutoRaise needs Accessibility access to raise and focus windows.",
+            : .needed(reason: "Follow Focus needs Accessibility access to raise and focus windows.",
                       actionTitle: "Grant Access")
     }
 

@@ -1,18 +1,19 @@
 # Quiver
 
-A single macOS menu-bar app that holds a quiver of small utilities you can flip on and off
+A single macOS menu-bar app that holds a quiver of small utilities you flip on and off
 individually. It lives in the menu bar, runs quietly in the background, and can launch at login.
 
-Quiver merges two previously separate apps — **AutoRaise** (focus-follows-mouse) and
-**HostsMachine** (an `/etc/hosts` editor) — into one pluggable hub, and adds **Keep Awake**.
+One app, several focused tools — instead of a separate menu-bar app for every little thing.
 
 ## Utilities
 
 | Utility | What it does | Permission |
 | --- | --- | --- |
-| **AutoRaise** | Raises and focuses the window under your pointer (focus-follows-mouse), with a configurable delay, hold-to-pause key, app exclusions, optional focus-first, and pointer-warp on app switch. | Accessibility |
-| **Hosts** | View, edit, enable/disable, add, and remove entries in `/etc/hosts`. Optionally install a one-time helper so edits stop asking for your password. | Admin (on write) |
-| **Keep Awake** | Prevents your Mac from sleeping while on, with an optional auto-off timer and a "keep the display awake too" option. | None |
+| **Follow Focus** | Raises and focuses the window under your pointer (focus-follows-mouse), with a configurable delay, hold-to-pause key, app exclusions, optional focus-first, and pointer-warp on app switch. | Accessibility |
+| **Drop Deck** | A floating tray: drop files, text, links, or images onto it, switch windows or Spaces, then drag them back out anywhere. Drop several at once and they collect into one stack. | None |
+| **Keep Awake** | Keeps your Mac from sleeping while on, with an optional auto-off timer and a "keep the display awake too" option. | None |
+| **Waypoint** | Toggle `/etc/hosts` entries on and off — and add, edit, or remove them — without opening Terminal. Optionally install a one-time helper so edits stop asking for your password. | Admin (on write) |
+| **Glance Me** | A quick webcam check before a call. The camera runs only while it's open. | Camera |
 
 ## Features
 
@@ -42,8 +43,14 @@ make clean
 
 On first launch, open the menu-bar popover and turn on the utilities you want:
 
-- **AutoRaise** → click **Grant Access** and enable Quiver under System Settings → Privacy & Security → Accessibility.
-- **Hosts** → edits use the macOS admin prompt; optionally turn on **Passwordless writes** to approve once.
+- **Follow Focus** → click **Grant Access** and enable Quiver under System Settings → Privacy & Security → Accessibility.
+- **Waypoint** → edits use the macOS admin prompt; optionally turn on **Passwordless writes** to approve once.
+- **Glance Me** → allow camera access when prompted.
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for how to build, the project
+layout, and how to add your own utility.
 
 ## Adding a new utility
 
@@ -62,8 +69,8 @@ The shell handles persistence, the menu bar, windows, launch-at-login, and error
 
 ```text
 Sources/Quiver/            Swift app shell (AppController, ModuleManager, UI, AppSettings, LoginItem)
-Sources/Quiver/Modules/    KeepAwake, Hosts, AutoRaise modules
-Sources/AutoRaiseEngine/   Objective-C++ AutoRaise engine + bridging header
+Sources/Quiver/Modules/    one self-contained folder per utility
+Sources/AutoRaiseEngine/   Objective-C++ window-raise engine (the GPLv3 AutoRaise engine) + bridging header
 Sources/QuiverHelper/      Root-owned helper for passwordless /etc/hosts writes
 App/                       Info.plist, entitlements
 scripts/                   Icon generator, DMG packager
@@ -71,7 +78,7 @@ scripts/                   Icon generator, DMG packager
 
 ## License & credits
 
-Quiver bundles the **AutoRaise** engine by sbmpost, which is licensed under the **GPLv3**. As a
-combined work, Quiver is distributed under the **GPLv3** — see [LICENSE.md](LICENSE.md) and
-[CREDITS.md](CREDITS.md). This is for personal use; if you distribute Quiver, you must comply with
+Quiver's window-raise engine — which powers **Follow Focus** — is the **AutoRaise** engine by sbmpost,
+licensed under the **GPLv3**. As a combined work, Quiver is distributed under the **GPLv3** — see
+[LICENSE.md](LICENSE.md) and [CREDITS.md](CREDITS.md). If you distribute Quiver, you must comply with
 the GPLv3.

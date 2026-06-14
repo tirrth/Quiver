@@ -40,8 +40,8 @@ final class MirrorModule: UtilityModule {
     init() {
         super.init(
             id: "mirror",
-            title: "Mirror",
-            subtitle: "Pop up a quick webcam mirror so you can check yourself before a meeting. The camera runs only while the mirror is open.",
+            title: "Glance Me",
+            subtitle: "Pop up a quick webcam preview so you can check yourself before a meeting. The camera runs only while it is open.",
             symbolName: "person.crop.square",
             isToggleable: false
         )
@@ -56,14 +56,14 @@ final class MirrorModule: UtilityModule {
     override var statusSummary: String {
         switch controller.authorization {
         case .denied, .restricted: return "Camera access needed"
-        default: return controller.isOpen ? "Mirror is open" : "Check your camera"
+        default: return controller.isOpen ? "Glance Me is open" : "Check your camera"
         }
     }
 
     override var permission: PermissionState {
         switch controller.authorization {
         case .authorized, .notDetermined: return .ok      // notDetermined → we prompt on open
-        case .denied: return .needed(reason: "Camera access lets Mirror show your webcam.", actionTitle: "Open Settings")
+        case .denied: return .needed(reason: "Camera access lets Glance Me show your webcam.", actionTitle: "Open Settings")
         case .restricted: return .unavailable(reason: "Camera access is restricted on this Mac.")
         @unknown default: return .ok
         }

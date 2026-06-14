@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Compact controls shown inline in the menu-bar popover when AutoRaise is on.
+/// Compact controls shown inline in the menu-bar popover when Follow Focus is on.
 struct AutoRaiseQuickControls: View {
     @ObservedObject var module: AutoRaiseModule
 
@@ -111,7 +111,7 @@ struct AutoRaiseSettingsView: View {
 
                 SettingRow(
                     title: "Hold-to-pause key",
-                    subtitle: "Hold this key to temporarily pause AutoRaise (e.g. while reaching across windows)."
+                    subtitle: "Hold this key to temporarily pause Follow Focus (e.g. while reaching across windows)."
                 ) {
                     Picker("", selection: Binding(
                         get: { module.disableKey },

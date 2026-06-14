@@ -1,7 +1,7 @@
 import Foundation
 
 // Root-owned helper installed by Quiver's Hosts utility. It only ever replaces /etc/hosts from a
-// Quiver-owned temp file, then flushes DNS caches. Ported from HostsMachineHelper.
+// Quiver-owned temp file, then flushes DNS caches.
 private enum HelperError: LocalizedError {
     case notRoot
     case invalidArguments

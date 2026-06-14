@@ -1,6 +1,6 @@
 import Foundation
 
-// Ported from HostsMachine. A single non-empty, parseable line in /etc/hosts.
+// A single non-empty, parseable line in /etc/hosts.
 struct HostEntry: Identifiable, Hashable {
     let id: Int
     let originalLine: String

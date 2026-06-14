@@ -1,6 +1,6 @@
 import Foundation
 
-/// Launch-at-login via a per-user LaunchAgent. Adapted from HostsMachine's proven mechanism:
+/// Launch-at-login via a per-user LaunchAgent. Built on a proven mechanism:
 /// it points the agent at the *installed* executable and can pass `--background` so Quiver
 /// starts hidden in the menu bar at login.
 enum LoginItem {
