@@ -81,14 +81,15 @@ struct QuiverSwitchStyle: ToggleStyle {
             Button { configuration.isOn.toggle() } label: {
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(on ? Color.accentColor : Color(nsColor: .tertiaryLabelColor))
-                        .frame(width: 30, height: 16)
+                        .fill(on ? Color.accentColor : Color(nsColor: .quaternaryLabelColor))
+                        .frame(width: 38, height: 18)
                     Circle()
                         .fill(.white)
                         .frame(width: 13, height: 13)
-                        .shadow(color: .black.opacity(0.25), radius: 0.5, y: 0.5)
-                        .offset(x: on ? 15 : 2)
+                        .shadow(color: .black.opacity(0.13), radius: 1.5, y: 0.5)
+                        .offset(x: on ? 22.5 : 2.5)
                 }
+                .frame(width: 38, height: 18)
                 .animation(.easeInOut(duration: 0.18), value: on)
                 .opacity(isEnabled ? 1 : 0.5)
                 .contentShape(Rectangle())
