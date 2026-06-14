@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The menu-bar popover — Quiver's primary control surface. Lists every utility with a toggle and
-/// inline quick controls, plus a footer to open the full app, settings, or quit.
+/// The menu-bar popover — compact and minimal: a tidy header, one row per utility, and a slim footer.
 struct HubPopoverView: View {
     @ObservedObject var manager: ModuleManager
     @ObservedObject var settings: AppSettings
@@ -14,77 +13,70 @@ struct HubPopoverView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+            Divider().opacity(0.6)
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(manager.modules.enumerated()), id: \.element.id) { index, module in
-                        ModuleRowView(module: module, onOpenModule: onOpenModule)
-                            .padding(.horizontal, 14)
-                        if index < manager.modules.count - 1 {
-                            Divider().padding(.leading, 50)
-                        }
-                    }
+            VStack(spacing: 1) {
+                ForEach(manager.modules) { module in
+                    ModuleRowView(module: module, onOpenModule: onOpenModule)
                 }
-                .padding(.vertical, 4)
             }
-            // Size to content, but cap the list height and scroll beyond it (small screens / many modules).
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxHeight: 460)
-            .scrollIndicators(.never)
+            .padding(.vertical, 5)
 
-            Divider()
+            Divider().opacity(0.6)
             footer
         }
-        .frame(width: 360)
+        .frame(width: 290)
         .fixedSize(horizontal: false, vertical: true)
-        // Chrome for the borderless panel (NSPopover used to provide this).
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Quiver").font(.system(size: 14, weight: .bold))
-                Text(manager.enabledCount == 1 ? "1 utility active" : "\(manager.enabledCount) utilities active")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+                .font(.system(size: 13, weight: .bold)).foregroundStyle(Color.accentColor)
+            Text("Quiver").font(.system(size: 14, weight: .bold))
             Spacer()
-            Button(action: onOpenSettings) {
-                Image(systemName: "gearshape")
-            }
-            .buttonStyle(.borderless)
-            .help("Settings")
+            IconButton(symbol: "gearshape", help: "Settings", action: onOpenSettings)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .frame(height: 42)
     }
 
     private var footer: some View {
         HStack(spacing: 8) {
             Button(action: onOpenApp) {
                 Label("Open Quiver", systemImage: "macwindow")
+                    .font(.system(size: 11, weight: .medium))
             }
-            .buttonStyle(.borderless)
-
+            .buttonStyle(.plain).foregroundStyle(.secondary)
             Spacer()
-
-            Button(action: onQuit) {
-                Label("Quit", systemImage: "power")
-            }
-            .buttonStyle(.borderless)
-            .help("Quit Quiver completely")
+            IconButton(symbol: "power", help: "Quit Quiver", action: onQuit)
         }
-        .font(.system(size: 12))
         .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .frame(height: 36)
+    }
+}
+
+/// A subtle ghost icon button used in the popover chrome.
+private struct IconButton: View {
+    let symbol: String
+    let help: String
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(hover ? Color.primary : Color.secondary)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(hover ? Color.primary.opacity(0.08) : Color.clear))
+        }
+        .buttonStyle(.plain).help(help).onHover { hover = $0 }
     }
 }

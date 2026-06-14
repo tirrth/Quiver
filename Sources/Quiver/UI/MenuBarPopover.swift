@@ -1,28 +1,26 @@
 import AppKit
 import SwiftUI
 
-/// A borderless panel that can become key without activating the app (so Escape/keyboard work in a
-/// menu-bar popover without stealing the user's app focus).
+/// Borderless panel that can become key (so its controls behave like a normal window and Escape works).
 private final class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }
 
-/// Quiver's menu-bar popover, implemented the way native menu-bar apps do it (no NSPopover arrow):
-/// a borderless panel anchored under the status item, that highlights the icon while open and
-/// dismisses on any outside click, Escape, a Space/Mission-Control change, or a second click of the
-/// icon. All dismissal hooks are torn down on close.
+/// Quiver's menu-bar popover — a borderless panel (no NSPopover arrow) anchored under the status item.
+/// It activates and becomes key on open so every control works on the first click, highlights the
+/// icon, and dismisses the moment it loses key focus (click anywhere else, switch apps, Escape, or a
+/// second click of the icon). Simple and reliable — no manual event-monitor juggling.
 @MainActor
-final class MenuBarPopover {
+final class MenuBarPopover: NSObject, NSWindowDelegate {
     private let panel: KeyablePanel
     private let hostingController: NSHostingController<AnyView>
     private weak var button: NSStatusBarButton?
 
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
-    private var keyMonitor: Any?
+    private var escMonitor: Any?
     private var spaceObserver: NSObjectProtocol?
-    private var activateObserver: NSObjectProtocol?
+    /// Guards against the icon click that closed the popover immediately reopening it.
+    private var ignoreOpenUntil = Date.distantPast
 
     private(set) var isShown = false
 
@@ -34,46 +32,51 @@ final class MenuBarPopover {
             backing: .buffered,
             defer: false
         )
+        super.init()
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.level = .popUpMenu                 // above floating windows + visible over fullscreen
+        panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.animationBehavior = .none
+        panel.delegate = self
         hostingController.view.wantsLayer = true
         hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
         panel.contentViewController = hostingController
     }
 
     func toggle(relativeTo button: NSStatusBarButton) {
-        isShown ? close() : show(relativeTo: button)
+        if isShown {
+            close()
+        } else if Date() >= ignoreOpenUntil {
+            show(relativeTo: button)
+        }
     }
 
     func show(relativeTo button: NSStatusBarButton) {
         guard !isShown, let buttonWindow = button.window else { return }
         self.button = button
 
-        // Size to the SwiftUI content.
         hostingController.view.layoutSubtreeIfNeeded()
         let size = hostingController.view.fittingSize
 
-        // Anchor centered under the icon, clamped onto the icon's screen.
+        // Anchor centered under the icon, clamped onto the icon's display.
         let buttonRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = buttonWindow.screen ?? NSScreen.main ?? NSScreen.screens[0]
         let visible = screen.visibleFrame
-        let gap: CGFloat = 6
         var x = buttonRect.midX - size.width / 2
         x = max(visible.minX + 8, min(x, visible.maxX - size.width - 8))
-        let y = buttonRect.minY - size.height - gap
+        let y = buttonRect.minY - size.height - 6
         let target = NSRect(x: x.rounded(), y: y.rounded(), width: size.width, height: size.height)
 
-        // Drop-in animation.
         panel.setFrame(target.offsetBy(dx: 0, dy: 8), display: false)
         panel.alphaValue = 0
-        panel.orderFrontRegardless()
-        panel.makeKey()
+
+        NSApp.activate(ignoringOtherApps: true)   // controls work on first click; enables resignKey dismissal
+        panel.makeKeyAndOrderFront(nil)
+
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.13
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -83,17 +86,17 @@ final class MenuBarPopover {
 
         button.highlight(true)
         isShown = true
-        installMonitors()
+        installHooks()
     }
 
     func close() {
         guard isShown else { return }
         isShown = false
-        removeMonitors()
         button?.highlight(false)
+        removeHooks()
         let win = panel
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.09
+            ctx.duration = 0.08
             win.animator().alphaValue = 0
         }, completionHandler: {
             win.orderOut(nil)
@@ -101,65 +104,31 @@ final class MenuBarPopover {
         })
     }
 
-    // MARK: Dismissal hooks
+    // MARK: Dismissal
 
-    private func installMonitors() {
-        // Clicks in other apps / the desktop.
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.close()
-        }
-        // Clicks within our own app (e.g. the main window) outside the panel — but not on the status
-        // icon, whose own action toggles the popover (so we don't double-handle / reopen).
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self else { return event }
-            if event.window == self.panel { return event }
-            if self.isOnStatusButton(event) { return event }
-            self.close()
+    func windowDidResignKey(_ notification: Notification) {
+        guard isShown else { return }
+        // Lost focus (clicked elsewhere / switched apps / clicked the icon) → dismiss.
+        ignoreOpenUntil = Date().addingTimeInterval(0.25)
+        close()
+    }
+
+    private func installHooks() {
+        escMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            if event.keyCode == 53 { self?.close(); return nil }   // Esc
             return event
         }
-        // Escape.
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            if event.keyCode == 53 { self?.close(); return nil }
-            return event
-        }
-        // Switching Space / opening Mission Control.
         spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.close() }
         }
-        // Switching to another app (e.g. cmd-tab, which a mouse monitor wouldn't catch). Ignore our
-        // own activation (opening a Quiver window from the popover).
-        activateObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] note in
-            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            if app?.bundleIdentifier == Bundle.main.bundleIdentifier { return }
-            Task { @MainActor in self?.close() }
-        }
     }
 
-    private func removeMonitors() {
-        for monitor in [globalMonitor, localMonitor, keyMonitor].compactMap({ $0 }) {
-            NSEvent.removeMonitor(monitor)
-        }
-        globalMonitor = nil
-        localMonitor = nil
-        keyMonitor = nil
-        if let spaceObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver)
-        }
-        if let activateObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(activateObserver)
-        }
+    private func removeHooks() {
+        if let escMonitor { NSEvent.removeMonitor(escMonitor) }
+        escMonitor = nil
+        if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
         spaceObserver = nil
-        activateObserver = nil
-    }
-
-    private func isOnStatusButton(_ event: NSEvent) -> Bool {
-        guard let button, let buttonWindow = button.window else { return false }
-        if event.window == buttonWindow { return true }
-        let rect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-        return NSMouseInRect(NSEvent.mouseLocation, rect, false)
     }
 }
