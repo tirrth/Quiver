@@ -50,8 +50,7 @@ struct ModuleRowView: View {
 
             if module.isToggleable {
                 Toggle("", isOn: isOn)
-                    .labelsHidden().toggleStyle(.switch).controlSize(.small)
-                    .tint(.accentColor)
+                    .labelsHidden().toggleStyle(QuiverSwitchStyle())
                     .disabled(module.permission.unavailableReason != nil)
             } else {
                 Image(systemName: "chevron.right")
@@ -62,5 +61,40 @@ struct ModuleRowView: View {
         .padding(.vertical, 7)
         .background(hovering ? Color.primary.opacity(0.05) : Color.clear)
         .onHover { hovering = $0 }
+    }
+}
+
+/// A switch drawn from explicit shapes so its on/off color is deterministic. The native `NSSwitch`
+/// can't be used inside the hub: an NSMenu is vibrant, and vibrancy desaturates the native switch's
+/// accent "on" fill to white (non-deterministically, per draw). This matches the native look (accent
+/// capsule + white knob) while guaranteeing the color. Uses a `Button`, not `onTapGesture`, so the
+/// click is consumed inside the menu's modal event loop (toggles without dismissing the menu).
+struct QuiverSwitchStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View { SwitchBody(configuration: configuration) }
+
+    struct SwitchBody: View {
+        let configuration: Configuration
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            let on = configuration.isOn
+            Button { configuration.isOn.toggle() } label: {
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(on ? Color.accentColor : Color(nsColor: .tertiaryLabelColor))
+                        .frame(width: 30, height: 16)
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 13, height: 13)
+                        .shadow(color: .black.opacity(0.25), radius: 0.5, y: 0.5)
+                        .offset(x: on ? 15 : 2)
+                }
+                .animation(.easeInOut(duration: 0.18), value: on)
+                .opacity(isEnabled ? 1 : 0.5)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!isEnabled)
+        }
     }
 }
