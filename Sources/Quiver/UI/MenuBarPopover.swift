@@ -18,6 +18,7 @@ final class MenuBarPopover: NSObject, NSWindowDelegate {
     private weak var button: NSStatusBarButton?
 
     private var escMonitor: Any?
+    private var clickMonitor: Any?
     private var spaceObserver: NSObjectProtocol?
     /// Guards against the icon click that closed the popover immediately reopening it.
     private var ignoreOpenUntil = Date.distantPast
@@ -74,7 +75,8 @@ final class MenuBarPopover: NSObject, NSWindowDelegate {
         panel.setFrame(target.offsetBy(dx: 0, dy: 8), display: false)
         panel.alphaValue = 0
 
-        NSApp.activate(ignoringOtherApps: true)   // controls work on first click; enables resignKey dismissal
+        // Do NOT activate the app: a non-activating panel already delivers clicks straight to its
+        // controls, and activating would redraw the menu bar and wipe the status-item highlight.
         panel.makeKeyAndOrderFront(nil)
 
         NSAnimationContext.runAnimationGroup { ctx in
@@ -84,17 +86,34 @@ final class MenuBarPopover: NSObject, NSWindowDelegate {
             panel.animator().alphaValue = 1
         }
 
-        // Defer past the status button's own click cycle, which would otherwise immediately
-        // un-highlight it (the click that opened the popover finishes after this method returns).
-        DispatchQueue.main.async { [weak button] in button?.highlight(true) }
+        setButtonHighlighted(true)
         isShown = true
         installHooks()
+    }
+
+    /// Draws the "selected" highlight behind the status icon ourselves. `NSButton.highlight(true)`
+    /// is unreliable for status items (it gets cleared by the click cycle / menu-bar redraws), so we
+    /// fill the button's layer with a neutral selection that adapts to the menu bar's light/dark
+    /// appearance — matching how native menu-bar items look while their menu is open.
+    private func setButtonHighlighted(_ on: Bool) {
+        guard let button else { return }
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 4
+        button.layer?.masksToBounds = true
+        guard on else {
+            button.layer?.backgroundColor = NSColor.clear.cgColor
+            return
+        }
+        let isDark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        button.layer?.backgroundColor = (isDark
+            ? NSColor.white.withAlphaComponent(0.22)
+            : NSColor.black.withAlphaComponent(0.13)).cgColor
     }
 
     func close() {
         guard isShown else { return }
         isShown = false
-        button?.highlight(false)
+        setButtonHighlighted(false)
         removeHooks()
         let win = panel
         NSAnimationContext.runAnimationGroup({ ctx in
@@ -120,6 +139,11 @@ final class MenuBarPopover: NSObject, NSWindowDelegate {
             if event.keyCode == 53 { self?.close(); return nil }   // Esc
             return event
         }
+        // Clicks in other apps / the desktop (a backup to resignKey, since a non-activating panel
+        // may not always resign key reliably).
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.close()
+        }
         spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -129,7 +153,9 @@ final class MenuBarPopover: NSObject, NSWindowDelegate {
 
     private func removeHooks() {
         if let escMonitor { NSEvent.removeMonitor(escMonitor) }
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
         escMonitor = nil
+        clickMonitor = nil
         if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
         spaceObserver = nil
     }
