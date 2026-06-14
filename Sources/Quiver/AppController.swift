@@ -13,7 +13,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private let launchesInBackground: Bool
     private var statusItem: NSStatusItem?
-    private var hubPopover: MenuBarPopover?
+    /// The hub shown on left-click is a system NSMenu hosting the SwiftUI hub. Letting the system own
+    /// the menu gives the native menu-bar highlight, click-away dismissal and no popover arrow for free.
+    private var activeHubMenu: NSMenu?
+    private var pendingMenuAction: (() -> Void)?
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var allowsTermination = false
@@ -150,37 +153,58 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         item.button?.action = #selector(statusButtonClicked(_:))
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         statusItem = item
-
-        hubPopover = MenuBarPopover(content: AnyView(
-            HubPopoverView(
-                manager: manager,
-                settings: settings,
-                onOpenApp: { [weak self] in self?.showMainWindow() },
-                onOpenModule: { [weak self] id in
-                    self?.uiState.selectedModuleID = id
-                    self?.showMainWindow()
-                },
-                onOpenSettings: { [weak self] in self?.showSettingsWindow() },
-                onQuit: { [weak self] in self?.quitCompletely() }
-            )
-        ))
     }
 
     @objc private func statusButtonClicked(_ sender: NSStatusBarButton) {
         if let event = NSApp.currentEvent, event.type == .rightMouseUp {
             showContextMenu(from: sender)
         } else {
-            togglePopover(sender)
+            showHubMenu(from: sender)
         }
     }
 
-    private func togglePopover(_ sender: NSStatusBarButton) {
+    /// Shows the hub as a system NSMenu anchored under the icon: the status item highlights natively,
+    /// it dismisses on click-away, and there's no popover arrow. The SwiftUI hub is hosted in a single
+    /// menu item; `performClick` runs the menu modally until it closes.
+    private func showHubMenu(from button: NSStatusBarButton) {
         refreshModulePermissions()
-        hubPopover?.toggle(relativeTo: sender)
+
+        let menu = NSMenu()
+        let item = NSMenuItem()
+        let hosting = NSHostingView(rootView: HubPopoverView(
+            manager: manager,
+            settings: settings,
+            onOpenApp: { [weak self] in self?.dismissHubMenu { self?.showMainWindow() } },
+            onOpenModule: { [weak self] id in
+                self?.dismissHubMenu { self?.uiState.selectedModuleID = id; self?.showMainWindow() }
+            },
+            onOpenSettings: { [weak self] in self?.dismissHubMenu { self?.showSettingsWindow() } },
+            onQuit: { [weak self] in self?.dismissHubMenu { self?.quitCompletely() } },
+            inMenu: true
+        ))
+        hosting.setFrameSize(hosting.fittingSize)
+        item.view = hosting
+        menu.addItem(item)
+
+        activeHubMenu = menu
+        statusItem?.menu = menu
+        button.performClick(nil)     // shows the menu (native highlight + dismissal); blocks until closed
+        statusItem?.menu = nil
+        activeHubMenu = nil
+
+        let action = pendingMenuAction
+        pendingMenuAction = nil
+        action?()
+    }
+
+    /// Closes the hub menu, then runs `action` once it has fully dismissed (so windows open cleanly).
+    private func dismissHubMenu(then action: @escaping () -> Void) {
+        pendingMenuAction = action
+        activeHubMenu?.cancelTracking()
     }
 
     private func closePopover() {
-        hubPopover?.close()
+        activeHubMenu?.cancelTracking()
     }
 
     /// Simple right-click fallback menu mirroring the popover toggles.
@@ -288,7 +312,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func updateStatusButton() {
         guard let button = statusItem?.button else { return }
-        button.image = Self.statusImage
+        // The icon image is set once in configureStatusItem(); don't re-stamp it here (the 2s
+        // permission timer calls this, and re-setting the image can disturb the native highlight).
         let enabled = manager.enabledCount
         var tip = "Quiver — \(enabled) of \(manager.modules.count) utilities on"
         if manager.hasPendingPermission { tip += " · action needed" }

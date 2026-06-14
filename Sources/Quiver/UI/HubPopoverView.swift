@@ -9,8 +9,25 @@ struct HubPopoverView: View {
     let onOpenModule: (String) -> Void
     let onOpenSettings: () -> Void
     let onQuit: () -> Void
+    /// When hosted inside an NSMenu the menu supplies its own background/rounding, so we drop our
+    /// own card chrome to avoid a doubled material.
+    var inMenu: Bool = false
 
     var body: some View {
+        if inMenu {
+            content
+        } else {
+            content
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.6)
@@ -27,12 +44,6 @@ struct HubPopoverView: View {
         }
         .frame(width: 290)
         .fixedSize(horizontal: false, vertical: true)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
     }
 
     private var header: some View {
