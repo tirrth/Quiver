@@ -20,8 +20,10 @@ final class AnchorModule: UtilityModule {
     private var lastTrusted: Bool
     private(set) var gap: Int
     private(set) var dragSnapEnabled: Bool
+    private(set) var doubleClickFullScreen: Bool
     private var overrides: [WindowAction: ShortcutOverride] = [:]
     private lazy var dragController = DragSnapController(engine: engine) { [weak self] in CGFloat(self?.gap ?? 0) }
+    private lazy var doubleClickController = DoubleClickController(engine: engine)
 
     static let gapChoices: [Int] = [0, 4, 8, 12, 16, 24]
 
@@ -29,6 +31,7 @@ final class AnchorModule: UtilityModule {
         let d = UserDefaults.standard
         gap = d.object(forKey: "module.anchor.gap") as? Int ?? 0
         dragSnapEnabled = d.object(forKey: "module.anchor.dragSnap") as? Bool ?? true
+        doubleClickFullScreen = d.object(forKey: "module.anchor.doubleClickFullScreen") as? Bool ?? false
         lastTrusted = AutoRaiseEngine.isAccessibilityTrusted()
         super.init(
             id: "anchor",
@@ -60,11 +63,13 @@ final class AnchorModule: UtilityModule {
         lastTrusted = AutoRaiseEngine.isAccessibilityTrusted()
         registerHotKeys()
         if dragSnapEnabled { dragController.start() }
+        if doubleClickFullScreen { doubleClickController.start() }
     }
 
     override func stop() {
         hotKeys.unregisterAll()
         dragController.stop()
+        doubleClickController.stop()
     }
 
     private func registerHotKeys() {
@@ -100,6 +105,13 @@ final class AnchorModule: UtilityModule {
         dragSnapEnabled = value
         UserDefaults.standard.set(value, forKey: defaultsKey("dragSnap"))
         if isEnabled { value ? dragController.start() : dragController.stop() }
+        notifyChange()
+    }
+
+    func setDoubleClickFullScreen(_ value: Bool) {
+        doubleClickFullScreen = value
+        UserDefaults.standard.set(value, forKey: defaultsKey("doubleClickFullScreen"))
+        if isEnabled { value ? doubleClickController.start() : doubleClickController.stop() }
         notifyChange()
     }
 

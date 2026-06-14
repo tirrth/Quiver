@@ -53,12 +53,20 @@ struct AnchorSettingsView: View {
     }
 
     private var dragCard: some View {
-        Card(title: "Drag to snap") {
+        Card(title: "Gestures") {
             SettingRow(
                 title: "Snap by dragging to screen edges",
-                subtitle: "Drag a window to an edge or corner; a preview shows the target size, and it snaps when you let go."
+                subtitle: "Drag a window to an edge or corner; a preview shows the target, and it snaps when you let go. The top edge goes full screen."
             ) {
                 Toggle("", isOn: Binding(get: { module.dragSnapEnabled }, set: { module.setDragSnap($0) }))
+                    .labelsHidden().toggleStyle(.switch)
+            }
+            Divider()
+            SettingRow(
+                title: "Double-click a title bar to full screen",
+                subtitle: "Overrides macOS's default double-click action (zoom/minimize) for the window you click."
+            ) {
+                Toggle("", isOn: Binding(get: { module.doubleClickFullScreen }, set: { module.setDoubleClickFullScreen($0) }))
                     .labelsHidden().toggleStyle(.switch)
             }
         }

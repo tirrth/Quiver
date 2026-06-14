@@ -92,7 +92,7 @@ final class AnchorEngine {
 
     /// Toggle native macOS full screen (own Space, hidden menu bar) for the window. Beeps if the
     /// window doesn't support full screen.
-    private func toggleFullScreen(_ window: AXUIElement) {
+    func toggleFullScreen(_ window: AXUIElement) {
         let attr = "AXFullScreen" as CFString
         var value: CFTypeRef?
         let isFull = AXUIElementCopyAttributeValue(window, attr, &value) == .success && (value as? Bool == true)
