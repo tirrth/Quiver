@@ -5,7 +5,7 @@ import Carbon.HIToolbox
 enum WindowAction: String, CaseIterable, Identifiable {
     case leftHalf, rightHalf, topHalf, bottomHalf
     case topLeft, topRight, bottomLeft, bottomRight
-    case maximize, center
+    case maximize, center, fullScreen
     case restore, previousDisplay, nextDisplay
 
     var id: String { rawValue }
@@ -22,6 +22,7 @@ enum WindowAction: String, CaseIterable, Identifiable {
         case .bottomRight: return "Bottom Right"
         case .maximize: return "Maximize"
         case .center: return "Center"
+        case .fullScreen: return "Full Screen"
         case .restore: return "Restore"
         case .previousDisplay: return "Previous Display"
         case .nextDisplay: return "Next Display"
@@ -40,6 +41,7 @@ enum WindowAction: String, CaseIterable, Identifiable {
         case .bottomRight: return "rectangle.inset.bottomright.filled"
         case .maximize: return "arrow.up.left.and.arrow.down.right"
         case .center: return "rectangle.center.inset.filled"
+        case .fullScreen: return "arrow.up.left.and.arrow.down.right.rectangle"
         case .restore: return "arrow.uturn.backward"
         case .previousDisplay: return "arrow.left.to.line"
         case .nextDisplay: return "arrow.right.to.line"
@@ -62,6 +64,7 @@ enum WindowAction: String, CaseIterable, Identifiable {
         case .bottomRight: return Shortcut(keyCode: UInt32(kVK_ANSI_K), modifiers: ctrlOpt)
         case .maximize:    return Shortcut(keyCode: UInt32(kVK_Return), modifiers: ctrlOpt)
         case .center:      return Shortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: ctrlOpt)
+        case .fullScreen:  return Shortcut(keyCode: UInt32(kVK_ANSI_F), modifiers: ctrlOpt)
         case .restore:         return Shortcut(keyCode: UInt32(kVK_Delete), modifiers: ctrlOpt)
         case .previousDisplay: return Shortcut(keyCode: UInt32(kVK_LeftArrow), modifiers: ctrlOptCmd)
         case .nextDisplay:     return Shortcut(keyCode: UInt32(kVK_RightArrow), modifiers: ctrlOptCmd)
@@ -114,7 +117,7 @@ enum WindowAction: String, CaseIterable, Identifiable {
         case .center:
             let w = area.width * 0.65, h = area.height * 0.75
             return CGRect(x: area.midX - w / 2, y: area.midY - h / 2, width: w, height: h)
-        case .restore, .previousDisplay, .nextDisplay:
+        case .restore, .previousDisplay, .nextDisplay, .fullScreen:
             return area   // handled specially by the engine; never reached through frame()
         }
     }

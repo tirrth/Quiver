@@ -105,7 +105,9 @@ final class DragSnapController {
         currentZone = newZone
         currentScreen = screen
         if let newZone {
-            preview.show(frame: newZone.frame(in: screen.visibleFrame, gap: gapProvider()))
+            // Full screen covers the whole display, so preview the full frame rather than the inset one.
+            let frame = newZone == .fullScreen ? screen.frame : newZone.frame(in: screen.visibleFrame, gap: gapProvider())
+            preview.show(frame: frame)
         } else {
             hidePreview()
         }
@@ -144,7 +146,7 @@ final class DragSnapController {
         if (nearR && bottomBand) || (nearB && rightBand) { return .bottomRight }
         if nearL { return .leftHalf }
         if nearR { return .rightHalf }
-        if nearT { return .maximize }
+        if nearT { return .fullScreen }   // top edge → native full screen
         if nearB { return .bottomHalf }
         return nil
     }

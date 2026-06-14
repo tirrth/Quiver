@@ -9,7 +9,7 @@ struct AnchorSettingsView: View {
 
     private let halves: [WindowAction] = [.leftHalf, .rightHalf, .topHalf, .bottomHalf]
     private let quarters: [WindowAction] = [.topLeft, .topRight, .bottomLeft, .bottomRight]
-    private let whole: [WindowAction] = [.maximize, .center, .restore]
+    private let whole: [WindowAction] = [.maximize, .fullScreen, .center, .restore]
     private let displays: [WindowAction] = [.previousDisplay, .nextDisplay]
 
     private var canArrange: Bool { module.permission.isOK }

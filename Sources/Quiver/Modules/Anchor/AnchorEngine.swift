@@ -43,6 +43,10 @@ final class AnchorEngine {
             moveToAdjacentDisplay(window, current: current, from: screen, forward: action == .nextDisplay)
             lastAction = nil
 
+        case .fullScreen:
+            toggleFullScreen(window)
+            lastAction = nil
+
         default:
             if let wid, savedFrames[wid] == nil { savedFrames[wid] = current }   // remember pre-snap frame
             let fraction = nextFraction(for: action, wid: wid)
@@ -53,6 +57,7 @@ final class AnchorEngine {
     /// Snap a specific window (used by drag-to-edge) to `action` on `screen`, remembering its
     /// pre-snap frame so `restore` can put it back.
     func snap(_ window: AXUIElement, to action: WindowAction, on screen: NSScreen, gap: CGFloat) {
+        if action == .fullScreen { toggleFullScreen(window); return }
         if let wid = windowID(of: window), savedFrames[wid] == nil, let current = appKitFrame(of: window) {
             savedFrames[wid] = current
         }
@@ -83,6 +88,17 @@ final class AnchorEngine {
         let w = min(current.width / from.width, 1) * to.width
         let h = min(current.height / from.height, 1) * to.height
         setFrame(CGRect(x: to.minX + relX * to.width, y: to.minY + relY * to.height, width: w, height: h), for: window)
+    }
+
+    /// Toggle native macOS full screen (own Space, hidden menu bar) for the window. Beeps if the
+    /// window doesn't support full screen.
+    private func toggleFullScreen(_ window: AXUIElement) {
+        let attr = "AXFullScreen" as CFString
+        var value: CFTypeRef?
+        let isFull = AXUIElementCopyAttributeValue(window, attr, &value) == .success && (value as? Bool == true)
+        if AXUIElementSetAttributeValue(window, attr, isFull ? kCFBooleanFalse : kCFBooleanTrue) != .success {
+            NSSound.beep()
+        }
     }
 
     private func windowID(of window: AXUIElement) -> CGWindowID? {
