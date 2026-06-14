@@ -45,6 +45,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private static func makeModules() -> [UtilityModule] {
         [
             AutoRaiseModule(),
+            AnchorModule(),
             HostsModule(),
             KeepAwakeModule(),
             ShelfModule(),
