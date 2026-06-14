@@ -44,6 +44,10 @@ struct HubPopoverView: View {
         }
         .frame(width: 290)
         .fixedSize(horizontal: false, vertical: true)
+        // When hosted in the NSMenu, the window focuses the first control (the gear) and macOS draws
+        // its keyboard focus ring, which looks like a stuck highlight. The hub is mouse-driven, so
+        // suppress the focus effect for the whole popover.
+        .noFocusRing()
     }
 
     private var header: some View {
@@ -70,6 +74,13 @@ struct HubPopoverView: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 36)
+    }
+}
+
+private extension View {
+    /// Suppresses the keyboard focus ring (macOS 14+). No-op on macOS 13.
+    @ViewBuilder func noFocusRing() -> some View {
+        if #available(macOS 14.0, *) { focusEffectDisabled() } else { self }
     }
 }
 
