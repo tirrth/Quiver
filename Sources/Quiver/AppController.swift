@@ -182,6 +182,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
             onQuit: { [weak self] in self?.dismissHubMenu { self?.quitCompletely() } },
             inMenu: true
         ))
+        // An NSMenu hosts its content with a vibrant material appearance, which desaturates controls
+        // (e.g. an "on" switch renders white instead of accent). Pin the hub to the concrete system
+        // appearance so its controls draw with normal colors.
+        hosting.appearance = NSApp.effectiveAppearance
         hosting.setFrameSize(hosting.fittingSize)
         item.view = hosting
         menu.addItem(item)

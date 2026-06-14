@@ -51,6 +51,7 @@ struct ModuleRowView: View {
             if module.isToggleable {
                 Toggle("", isOn: isOn)
                     .labelsHidden().toggleStyle(.switch).controlSize(.small)
+                    .tint(.accentColor)
                     .disabled(module.permission.unavailableReason != nil)
             } else {
                 Image(systemName: "chevron.right")
