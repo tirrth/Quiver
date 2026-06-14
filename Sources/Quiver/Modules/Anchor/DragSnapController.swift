@@ -9,6 +9,7 @@ import ApplicationServices
 final class DragSnapController {
     private let engine: AnchorEngine
     private let gapProvider: () -> CGFloat
+    private let topEdgeFullScreen: () -> Bool
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -25,9 +26,10 @@ final class DragSnapController {
     private let cornerBand: CGFloat = 130     // how far along the edges the corner zones reach
     private let moveThreshold: CGFloat = 4    // window must move this far to count as a drag
 
-    init(engine: AnchorEngine, gap: @escaping () -> CGFloat) {
+    init(engine: AnchorEngine, gap: @escaping () -> CGFloat, topEdgeFullScreen: @escaping () -> Bool) {
         self.engine = engine
         self.gapProvider = gap
+        self.topEdgeFullScreen = topEdgeFullScreen
     }
 
     var isRunning: Bool { tap != nil }
@@ -146,7 +148,9 @@ final class DragSnapController {
         if (nearR && bottomBand) || (nearB && rightBand) { return .bottomRight }
         if nearL { return .leftHalf }
         if nearR { return .rightHalf }
-        if nearT { return .fullScreen }   // top edge → native full screen
+        // Top edge → native full screen, unless double-click already handles full screen, in which
+        // case the drag does a windowed maximize instead.
+        if nearT { return topEdgeFullScreen() ? .fullScreen : .maximize }
         if nearB { return .bottomHalf }
         return nil
     }

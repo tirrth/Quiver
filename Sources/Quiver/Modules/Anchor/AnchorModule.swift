@@ -22,7 +22,11 @@ final class AnchorModule: UtilityModule {
     private(set) var dragSnapEnabled: Bool
     private(set) var doubleClickFullScreen: Bool
     private var overrides: [WindowAction: ShortcutOverride] = [:]
-    private lazy var dragController = DragSnapController(engine: engine) { [weak self] in CGFloat(self?.gap ?? 0) }
+    private lazy var dragController = DragSnapController(
+        engine: engine,
+        gap: { [weak self] in CGFloat(self?.gap ?? 0) },
+        topEdgeFullScreen: { [weak self] in !(self?.doubleClickFullScreen ?? false) }
+    )
     private lazy var doubleClickController = DoubleClickController(engine: engine)
 
     static let gapChoices: [Int] = [0, 4, 8, 12, 16, 24]

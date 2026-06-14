@@ -56,7 +56,7 @@ struct AnchorSettingsView: View {
         Card(title: "Gestures") {
             SettingRow(
                 title: "Snap by dragging to screen edges",
-                subtitle: "Drag a window to an edge or corner; a preview shows the target, and it snaps when you let go. The top edge goes full screen."
+                subtitle: "Drag a window to an edge or corner; a preview shows the target. The top edge goes full screen — or windowed maximize when double-click full screen (below) is on."
             ) {
                 Toggle("", isOn: Binding(get: { module.dragSnapEnabled }, set: { module.setDragSnap($0) }))
                     .labelsHidden().toggleStyle(.switch)
