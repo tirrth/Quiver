@@ -30,7 +30,6 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     private let menuBarCoordinator = MenuBarCoordinator()
     private var pendingMenuAction: (() -> Void)?
     private var mainWindow: NSWindow?
-    private var settingsWindow: NSWindow?
     private var pinnedItems: PinnedStatusItems!
     private var allowsTermination = false
     private var permissionTimer: Timer?
@@ -113,13 +112,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// "Settings" opens the app itself on its General pane (a `nil` module selection), rather than a
+    /// separate settings window — so it's the same window you get from "Open Quiver".
     func showSettingsWindow() {
-        if settingsWindow == nil { settingsWindow = makeSettingsWindow() }
-        closePopover()
-        updateActivationPolicy(showDockIcon: true)
-        settingsWindow?.makeKeyAndOrderFront(nil)
-        settingsWindow?.orderFrontRegardless()
-        NSApp.activate(ignoringOtherApps: true)
+        uiState.selectedModuleID = nil
+        showMainWindow()
     }
 
     private func makeMainWindow() -> NSWindow {
@@ -143,23 +140,6 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
         window.minSize = NSSize(width: 720, height: 460)
-        window.delegate = self
-        return window
-    }
-
-    private func makeSettingsWindow() -> NSWindow {
-        let root = SettingsView(settings: settings, manager: manager)
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 440),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Quiver Settings"
-        window.center()
-        window.contentViewController = NSHostingController(rootView: root)
-        window.isReleasedWhenClosed = false
-        window.tabbingMode = .disallowed
         window.delegate = self
         return window
     }
@@ -322,28 +302,51 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         return path
     }
 
-    // The menu-bar glyph: the gem silhouette as a template image, redrawn per display scale (crisp on
-    // Retina) and recoloured by the system. Padded so it sits a touch smaller in the bar.
+    // The menu-bar glyph: a faceted gem drawn as line-art, as a *template* image — so the system
+    // recolours it (white on dark menu bars, black on light) to match the other menu-bar icons, while
+    // the facet lines keep it looking like a gem rather than a flat blob. Drawn per display scale.
     private static let statusImage: NSImage = {
         let pt: CGFloat = 18
         let image = NSImage(size: NSSize(width: pt, height: pt), flipped: false) { rect in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-            let path = gemOutlinePath(100)
-            let bb = path.boundingBox
-            let avail = rect.insetBy(dx: rect.width * 0.08, dy: rect.height * 0.08)
-            let scale = min(avail.width / bb.width, avail.height / bb.height)
-            var t = CGAffineTransform(translationX: avail.midX - bb.midX * scale,
-                                      y: avail.midY - bb.midY * scale).scaledBy(x: scale, y: scale)
-            if let scaled = path.copy(using: &t) {
-                ctx.addPath(scaled)
-                ctx.setFillColor(NSColor.black.cgColor)
-                ctx.fillPath()
-            }
+            drawMenuGem(in: rect, ctx: ctx)
             return true
         }
         image.isTemplate = true
         return image
     }()
+
+    /// The seven gem vertices (A,B,C,D,E,F,G) in an SxS box.
+    private static func gemPoints(_ S: CGFloat) -> [CGPoint] {
+        let cx = S * 0.5
+        return [
+            CGPoint(x: cx - S * 0.20, y: S * 0.72), CGPoint(x: cx + S * 0.20, y: S * 0.72),
+            CGPoint(x: cx + S * 0.31, y: S * 0.52), CGPoint(x: cx, y: S * 0.22),
+            CGPoint(x: cx - S * 0.31, y: S * 0.52),
+            CGPoint(x: cx - S * 0.105, y: S * 0.52), CGPoint(x: cx + S * 0.105, y: S * 0.52)
+        ]
+    }
+
+    private static func drawMenuGem(in rect: CGRect, ctx: CGContext) {
+        let unit: CGFloat = 100
+        let bb = gemOutlinePath(unit).boundingBox
+        let avail = rect.insetBy(dx: rect.width * 0.08, dy: rect.height * 0.08)
+        let scale = min(avail.width / bb.width, avail.height / bb.height)
+        ctx.saveGState()
+        ctx.translateBy(x: avail.midX - bb.midX * scale, y: avail.midY - bb.midY * scale)
+        ctx.scaleBy(x: scale, y: scale)
+        let p = gemPoints(unit)
+        ctx.setStrokeColor(NSColor.black.cgColor)   // colour is ignored for a template; only the shape matters
+        ctx.setLineWidth(unit * 0.052)
+        ctx.setLineJoin(.round); ctx.setLineCap(.round)
+        ctx.addPath(gemOutlinePath(unit)); ctx.strokePath()
+        // Facet lines: girdle (E–C), crown (A–F, B–G), pavilion (F–D, G–D).
+        for s in [[4, 2], [0, 5], [1, 6], [5, 3], [6, 3]] {
+            ctx.move(to: p[s[0]]); ctx.addLine(to: p[s[1]])
+        }
+        ctx.strokePath()
+        ctx.restoreGState()
+    }
 
     private func updateStatusButton() {
         guard let button = statusItem?.button else { return }
@@ -374,12 +377,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     private func hideToMenuBar() {
         closePopover()
         mainWindow?.orderOut(nil)
-        settingsWindow?.orderOut(nil)
         updateActivationPolicy(showDockIcon: false)
     }
 
     private func updateActivationPolicyForVisibleWindows() {
-        let hasVisible = [mainWindow, settingsWindow].contains { $0?.isVisible == true }
+        let hasVisible = mainWindow?.isVisible == true
         updateActivationPolicy(showDockIcon: hasVisible)
     }
 
@@ -397,7 +399,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         alert.messageText = "Quiver"
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
-        if let window = NSApp.keyWindow ?? mainWindow ?? settingsWindow, window.isVisible {
+        if let window = NSApp.keyWindow ?? mainWindow, window.isVisible {
             alert.beginSheetModal(for: window)
         } else {
             updateActivationPolicy(showDockIcon: true)

@@ -43,7 +43,7 @@ struct MainWindowView: View {
         } detail: {
             Group {
                 if let id = uiState.selectedModuleID, let module = manager.module(id: id) {
-                    ModuleDetailView(module: module)
+                    ModuleDetailView(module: module, manager: manager)
                 } else {
                     SettingsView(settings: settings, manager: manager)
                 }
@@ -72,9 +72,14 @@ private struct SidebarModuleLabel: View {
 /// Header (icon, title, enable toggle, permission) + the module's own settings pane.
 struct ModuleDetailView: View {
     @ObservedObject var module: UtilityModule
+    @ObservedObject var manager: ModuleManager
 
     private var isOn: Binding<Bool> {
         Binding(get: { module.isEnabled }, set: { module.setEnabled($0) })
+    }
+
+    private var showInMenuBar: Binding<Bool> {
+        Binding(get: { manager.isPinned(module.id) }, set: { manager.setPinned(module.id, $0) })
     }
 
     var body: some View {
@@ -111,6 +116,21 @@ struct ModuleDetailView: View {
                         module.requestPermission()
                     }
                 }
+
+                HStack(spacing: 12) {
+                    Image(systemName: "menubar.arrow.up.rectangle")
+                        .font(.system(size: 15)).foregroundStyle(.secondary).frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show in menu bar").font(.system(size: 13, weight: .medium))
+                        Text("Add a dedicated menu-bar icon for quick access to \(module.title).")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 10)
+                    Toggle("", isOn: showInMenuBar).labelsHidden().toggleStyle(.switch)
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.04)))
 
                 module.makeSettingsView()
             }

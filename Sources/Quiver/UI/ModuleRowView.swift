@@ -49,18 +49,6 @@ struct ModuleRowView: View {
             .contentShape(Rectangle())
             .onTapGesture { onOpenModule(module.id) }
 
-            Button {
-                manager.setPinned(module.id, !manager.isPinned(module.id))
-            } label: {
-                Image(systemName: manager.isPinned(module.id) ? "pin.fill" : "pin")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(manager.isPinned(module.id) ? Color.accentColor : Color.secondary.opacity(0.55))
-                    .frame(width: 22, height: 22)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(manager.isPinned(module.id) ? "Remove from menu bar" : "Add to menu bar")
-
             if module.isToggleable {
                 Toggle("", isOn: isOn)
                     .labelsHidden().toggleStyle(QuiverSwitchStyle())
