@@ -13,6 +13,14 @@ final class MenuBarCoordinator {
         entries.append(Entry(button: button, open: open))
     }
 
+    private var panelClosers: [() -> Void] = []
+
+    /// Register a transient panel (e.g. the camera) to be closed when any of our menus opens.
+    func registerPanelCloser(_ close: @escaping () -> Void) { panelClosers.append(close) }
+
+    /// Close registered transient panels — called as one of our menus is about to open.
+    func closeOpenPanels() { panelClosers.forEach { $0() } }
+
     /// Called from a menu's `menuDidClose`: if the cursor sits over a *different* one of our icons,
     /// open it (deferred a tick so the just-closed menu has fully torn down first).
     func openItemUnderCursor(excluding closing: NSStatusBarButton?) {
@@ -186,6 +194,10 @@ final class PinnedItemHandler: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         controlsHosting?.appearance = NSApp.effectiveAppearance
         if let hosting = controlsHosting { hosting.setFrameSize(hosting.fittingSize) }
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        coordinator.closeOpenPanels()   // e.g. close the camera when a menu opens
     }
 
     func menuDidClose(_ menu: NSMenu) {

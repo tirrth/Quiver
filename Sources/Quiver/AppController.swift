@@ -195,6 +195,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
             Task { @MainActor in self?.pinnedItems?.sync() }
         }
         pinnedItems.sync()
+
+        // Close the camera (Glance Me) whenever one of our menus opens.
+        if let mirror = manager.module(id: "mirror") as? MirrorModule {
+            menuBarCoordinator.registerPanelCloser { [weak mirror] in mirror?.controller.close() }
+        }
     }
 
     /// Builds the hub's SwiftUI content once. It's reactive (observes the manager/settings), so it
@@ -231,6 +236,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         refreshModulePermissions()
         hubHosting?.appearance = NSApp.effectiveAppearance
         if let hosting = hubHosting { hosting.setFrameSize(hosting.fittingSize) }
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === hubMenu else { return }
+        menuBarCoordinator.closeOpenPanels()   // close the camera when the hub opens
     }
 
     /// Runs a hub action (open a window, quit…) after the menu has fully dismissed, so windows open cleanly.
@@ -299,20 +309,38 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
 
     // MARK: Status item appearance
 
-    // The menu-bar glyph: a grouped-panels symbol, as a template image the system recolors.
+    /// The gem outline (matching the app icon), in an SxS box.
+    static func gemOutlinePath(_ S: CGFloat) -> CGPath {
+        let cx = S * 0.5
+        let path = CGMutablePath()
+        path.addLines(between: [
+            CGPoint(x: cx - S * 0.20, y: S * 0.72), CGPoint(x: cx + S * 0.20, y: S * 0.72),
+            CGPoint(x: cx + S * 0.31, y: S * 0.52), CGPoint(x: cx, y: S * 0.22),
+            CGPoint(x: cx - S * 0.31, y: S * 0.52)
+        ])
+        path.closeSubpath()
+        return path
+    }
+
+    // The menu-bar glyph: the gem silhouette as a template image, redrawn per display scale (crisp on
+    // Retina) and recoloured by the system. Padded so it sits a touch smaller in the bar.
     private static let statusImage: NSImage = {
-        let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        if let image = NSImage(systemSymbolName: "rectangle.3.group.fill", accessibilityDescription: "Quiver")?
-            .withSymbolConfiguration(config) {
-            image.isTemplate = true
-            return image
+        let pt: CGFloat = 18
+        let image = NSImage(size: NSSize(width: pt, height: pt), flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            let path = gemOutlinePath(100)
+            let bb = path.boundingBox
+            let avail = rect.insetBy(dx: rect.width * 0.08, dy: rect.height * 0.08)
+            let scale = min(avail.width / bb.width, avail.height / bb.height)
+            var t = CGAffineTransform(translationX: avail.midX - bb.midX * scale,
+                                      y: avail.midY - bb.midY * scale).scaledBy(x: scale, y: scale)
+            if let scaled = path.copy(using: &t) {
+                ctx.addPath(scaled)
+                ctx.setFillColor(NSColor.black.cgColor)
+                ctx.fillPath()
+            }
+            return true
         }
-        // Fallback: a simple drawn glyph.
-        let image = NSImage(size: NSSize(width: 18, height: 18))
-        image.lockFocus()
-        NSColor.black.setFill()
-        NSBezierPath(roundedRect: NSRect(x: 2, y: 2, width: 14, height: 14), xRadius: 3, yRadius: 3).fill()
-        image.unlockFocus()
         image.isTemplate = true
         return image
     }()

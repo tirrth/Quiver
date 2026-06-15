@@ -1,87 +1,85 @@
 import AppKit
 
-// Renders Quiver's app icon — a bold archery arrow (a "quiver" holds arrows) in a vibrant
-// blue→purple gradient with a glow, on a near-black squircle — to a 1024×1024 PNG.
+// Renders Quiver's app icon — a faceted gem (brilliant-cut, light-catching facets) with a glow on a
+// near-black squircle — to a 1024×1024 PNG. The same gem silhouette is reused as the menu-bar glyph.
 // Usage: swift generate_icon.swift <output.png>
 
 let outPath = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "AppIcon-1024.png"
 let size: CGFloat = 1024
 
-func C(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> NSColor {
-    NSColor(srgbRed: r / 255, green: g / 255, blue: b / 255, alpha: 1)
+func C(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> NSColor { NSColor(srgbRed: r / 255, green: g / 255, blue: b / 255, alpha: 1) }
+func squircle(_ rect: CGRect, _ rad: CGFloat) -> CGPath { CGPath(roundedRect: rect, cornerWidth: rad, cornerHeight: rad, transform: nil) }
+
+/// Gem vertices in an SxS box (y-up): table at top, point at bottom.
+func gemPoints(_ S: CGFloat) -> [String: CGPoint] {
+    let cx = S * 0.5
+    return [
+        "A": CGPoint(x: cx - S * 0.20, y: S * 0.72), "B": CGPoint(x: cx + S * 0.20, y: S * 0.72),
+        "C": CGPoint(x: cx + S * 0.31, y: S * 0.52), "E": CGPoint(x: cx - S * 0.31, y: S * 0.52),
+        "D": CGPoint(x: cx, y: S * 0.22),
+        "F": CGPoint(x: cx - S * 0.105, y: S * 0.52), "G": CGPoint(x: cx + S * 0.105, y: S * 0.52)
+    ]
 }
 
-func squircle(_ rect: CGRect, _ rad: CGFloat) -> CGPath {
-    CGPath(roundedRect: rect, cornerWidth: rad, cornerHeight: rad, transform: nil)
+func gemOutline(_ S: CGFloat) -> CGPath {
+    let p = gemPoints(S)
+    let path = CGMutablePath()
+    path.addLines(between: [p["A"]!, p["B"]!, p["C"]!, p["D"]!, p["E"]!])
+    path.closeSubpath()
+    return path
 }
 
-// A bold archery arrow — shaft, head, and two swept feathers — sized to fill most of the icon.
-func arrowPath(_ S: CGFloat) -> CGPath {
-    let cx = S / 2, sw = S * 0.13
-    let yNock = S * 0.135, yTip = S * 0.90, yHeadBase = S * 0.55, hw = S * 0.25
-    let p = CGMutablePath()
-    p.addRoundedRect(in: CGRect(x: cx - sw / 2, y: yNock, width: sw, height: yHeadBase - yNock + S * 0.04),
-                     cornerWidth: sw / 2, cornerHeight: sw / 2)
-    let head = CGMutablePath()
-    head.move(to: CGPoint(x: cx, y: yTip))
-    head.addLine(to: CGPoint(x: cx - hw, y: yHeadBase))
-    head.addLine(to: CGPoint(x: cx + hw, y: yHeadBase)); head.closeSubpath()
-    p.addPath(head)
-    for s in [CGFloat(-1), 1] {
-        let inX = cx + s * sw * 0.32
-        let f = CGMutablePath()
-        f.move(to: CGPoint(x: inX, y: yNock + S * 0.40))
-        f.addLine(to: CGPoint(x: cx + s * (sw * 0.32 + S * 0.20), y: yNock + S * 0.17))
-        f.addLine(to: CGPoint(x: cx + s * (sw * 0.32 + S * 0.20), y: yNock - S * 0.005))
-        f.addLine(to: CGPoint(x: inX, y: yNock + S * 0.08)); f.closeSubpath()
-        p.addPath(f)
+func facet(_ ctx: CGContext, _ ps: [CGPoint], _ col: NSColor) {
+    ctx.setFillColor(col.cgColor)
+    ctx.move(to: ps[0]); for p in ps.dropFirst() { ctx.addLine(to: p) }; ctx.closePath(); ctx.fillPath()
+}
+
+func drawGemFacets(_ ctx: CGContext, _ S: CGFloat) {
+    let p = gemPoints(S)
+    facet(ctx, [p["A"]!, p["B"]!, p["G"]!, p["F"]!], C(198, 240, 255))   // table (brightest)
+    facet(ctx, [p["A"]!, p["F"]!, p["E"]!], C(140, 214, 255))           // crown left
+    facet(ctx, [p["B"]!, p["C"]!, p["G"]!], C(96, 190, 240))            // crown right
+    facet(ctx, [p["E"]!, p["F"]!, p["D"]!], C(58, 150, 220))            // pavilion left
+    facet(ctx, [p["F"]!, p["G"]!, p["D"]!], C(40, 122, 200))            // pavilion centre (deepest)
+    facet(ctx, [p["G"]!, p["C"]!, p["D"]!], C(64, 160, 225))            // pavilion right
+    ctx.setStrokeColor(NSColor(white: 1, alpha: 0.18).cgColor)
+    ctx.setLineWidth(S * 0.006)
+    for seg in [["A", "F"], ["B", "G"], ["F", "G"], ["E", "F"], ["G", "C"], ["F", "D"], ["G", "D"]] {
+        ctx.move(to: p[seg[0]]!); ctx.addLine(to: p[seg[1]]!)
     }
-    return p
+    ctx.strokePath()
 }
 
 let image = NSImage(size: NSSize(width: size, height: size))
 image.lockFocus()
 guard let ctx = NSGraphicsContext.current?.cgContext else { exit(1) }
 let S = size
-let rect = CGRect(x: 0, y: 0, width: S, height: S)
-let rad = S * 0.225
 let cs = CGColorSpaceCreateDeviceRGB()
 
-let glowColor = C(94, 108, 255)
-
-// Near-black squircle with a soft accent glow behind the arrow.
+// Near-black squircle with a soft accent glow behind the gem.
 ctx.saveGState()
-ctx.addPath(squircle(rect, rad)); ctx.clip()
-let bg = CGGradient(colorsSpace: cs, colors: [C(40, 40, 52).cgColor, C(10, 10, 15).cgColor] as CFArray, locations: [0, 1])!
+ctx.addPath(squircle(CGRect(x: 0, y: 0, width: S, height: S), S * 0.225)); ctx.clip()
+let bg = CGGradient(colorsSpace: cs, colors: [C(28, 32, 44).cgColor, C(8, 10, 16).cgColor] as CFArray, locations: [0, 1])!
 ctx.drawLinearGradient(bg, start: CGPoint(x: S * 0.2, y: S * 0.95), end: CGPoint(x: S * 0.85, y: S * 0.05), options: [])
-let glow = CGGradient(colorsSpace: cs, colors: [glowColor.withAlphaComponent(0.55).cgColor, glowColor.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1])!
-ctx.drawRadialGradient(glow, startCenter: CGPoint(x: S * 0.5, y: S * 0.54), startRadius: 0,
-                       endCenter: CGPoint(x: S * 0.5, y: S * 0.54), endRadius: S * 0.52, options: [])
+let glow = CGGradient(colorsSpace: cs, colors: [C(60, 170, 235).withAlphaComponent(0.5).cgColor, C(60, 170, 235).withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1])!
+ctx.drawRadialGradient(glow, startCenter: CGPoint(x: S * 0.5, y: S * 0.5), startRadius: 0,
+                       endCenter: CGPoint(x: S * 0.5, y: S * 0.5), endRadius: S * 0.5, options: [])
 ctx.restoreGState()
 
-let arrow = arrowPath(S)
-let b = arrow.boundingBox
-
-// Glowing halo around the arrow.
+// Glow halo around the gem.
 ctx.saveGState()
-ctx.setShadow(offset: .zero, blur: S * 0.055, color: glowColor.withAlphaComponent(0.95).cgColor)
-ctx.addPath(arrow); ctx.setFillColor(NSColor.white.cgColor); ctx.fillPath()
+ctx.setShadow(offset: .zero, blur: S * 0.05, color: C(80, 190, 255).withAlphaComponent(0.9).cgColor)
+ctx.addPath(gemOutline(S)); ctx.setFillColor(NSColor.white.cgColor); ctx.fillPath()
 ctx.restoreGState()
 
-// Vibrant gradient fill + a top gloss.
-ctx.saveGState()
-ctx.addPath(arrow); ctx.clip()
-let ag = CGGradient(colorsSpace: cs, colors: [C(170, 224, 255).cgColor, C(74, 141, 255).cgColor, C(150, 92, 255).cgColor] as CFArray, locations: [0, 0.5, 1])!
-ctx.drawLinearGradient(ag, start: CGPoint(x: b.minX, y: b.maxY), end: CGPoint(x: b.maxX, y: b.minY), options: [])
-let gloss = CGGradient(colorsSpace: cs, colors: [NSColor.white.withAlphaComponent(0.5).cgColor, NSColor.white.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1])!
-ctx.drawLinearGradient(gloss, start: CGPoint(x: 0, y: b.maxY), end: CGPoint(x: 0, y: b.maxY - b.height * 0.4), options: [])
-ctx.restoreGState()
+drawGemFacets(ctx, S)
 
-// Thin inner-edge highlight for a premium glass rim.
+// Top sheen across the gem.
 ctx.saveGState()
-ctx.addPath(squircle(rect, rad)); ctx.clip()
-ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.14).cgColor); ctx.setLineWidth(S * 0.005)
-ctx.addPath(squircle(rect.insetBy(dx: S * 0.012, dy: S * 0.012), rad * 0.96)); ctx.strokePath()
+ctx.addPath(gemOutline(S)); ctx.clip()
+let b = gemOutline(S).boundingBox
+let gloss = CGGradient(colorsSpace: cs, colors: [NSColor.white.withAlphaComponent(0.45).cgColor, NSColor.white.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1])!
+ctx.drawLinearGradient(gloss, start: CGPoint(x: 0, y: b.maxY), end: CGPoint(x: 0, y: b.maxY - b.height * 0.35), options: [])
 ctx.restoreGState()
 
 image.unlockFocus()
