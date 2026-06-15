@@ -1,76 +1,26 @@
 import AppKit
 
-// Renders Quiver's app icon — a bold archery arrow (a "quiver" holds arrows), rendered as frosted
-// glass on a blue→purple gradient squircle with a specular sheen — to a 1024×1024 PNG. The same
-// arrow shape (see QuiverIcon.arrowGlyph) is reused monochrome as the menu-bar glyph.
+// Renders Quiver's app icon — a bold archery arrow (a "quiver" holds arrows) in a vibrant
+// blue→purple gradient with a glow, on a near-black squircle — to a 1024×1024 PNG.
 // Usage: swift generate_icon.swift <output.png>
 
 let outPath = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "AppIcon-1024.png"
 let size: CGFloat = 1024
 
-func squircle(_ r: CGRect, _ rad: CGFloat) -> CGPath {
-    CGPath(roundedRect: r, cornerWidth: rad, cornerHeight: rad, transform: nil)
+func C(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> NSColor {
+    NSColor(srgbRed: r / 255, green: g / 255, blue: b / 255, alpha: 1)
 }
 
-// Gradient squircle with a soft corner sheen and a thin inner-edge highlight.
-func background(_ ctx: CGContext, _ S: CGFloat) {
-    let rect = CGRect(x: 0, y: 0, width: S, height: S); let rad = S * 0.225
-    let cs = CGColorSpaceCreateDeviceRGB()
-    ctx.saveGState(); ctx.addPath(squircle(rect, rad)); ctx.clip()
-    let g = CGGradient(colorsSpace: cs, colors: [
-        NSColor(srgbRed: 0.34, green: 0.58, blue: 1.0, alpha: 1).cgColor,
-        NSColor(srgbRed: 0.46, green: 0.30, blue: 0.95, alpha: 1).cgColor] as CFArray, locations: [0, 1])!
-    ctx.drawLinearGradient(g, start: CGPoint(x: S * 0.1, y: S * 0.95), end: CGPoint(x: S * 0.95, y: S * 0.05), options: [])
-    let sheen = CGGradient(colorsSpace: cs, colors: [
-        NSColor.white.withAlphaComponent(0.55).cgColor,
-        NSColor.white.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1])!
-    ctx.drawRadialGradient(sheen, startCenter: CGPoint(x: S * 0.30, y: S * 0.82), startRadius: 0,
-                           endCenter: CGPoint(x: S * 0.30, y: S * 0.82), endRadius: S * 0.72, options: [])
-    ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.30).cgColor); ctx.setLineWidth(S * 0.006)
-    ctx.addPath(squircle(rect.insetBy(dx: S * 0.012, dy: S * 0.012), rad * 0.95)); ctx.strokePath()
-    ctx.restoreGState()
+func squircle(_ rect: CGRect, _ rad: CGFloat) -> CGPath {
+    CGPath(roundedRect: rect, cornerWidth: rad, cornerHeight: rad, transform: nil)
 }
 
-// Diagonal specular streak across the glass.
-func sheenStreak(_ ctx: CGContext, _ S: CGFloat) {
-    let rect = CGRect(x: 0, y: 0, width: S, height: S); let rad = S * 0.225
-    ctx.saveGState(); ctx.addPath(squircle(rect, rad)); ctx.clip()
-    let cs = CGColorSpaceCreateDeviceRGB()
-    let g = CGGradient(colorsSpace: cs, colors: [
-        NSColor.white.withAlphaComponent(0).cgColor,
-        NSColor.white.withAlphaComponent(0.18).cgColor,
-        NSColor.white.withAlphaComponent(0).cgColor] as CFArray, locations: [0.40, 0.60, 0.80])!
-    ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: S), end: CGPoint(x: S, y: 0), options: [])
-    ctx.restoreGState()
-}
-
-// Fills a glyph path as frosted glass: drop shadow for depth, a top→bottom gloss, and a bright crown.
-func glassFill(_ ctx: CGContext, _ path: CGPath, _ S: CGFloat) {
-    ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -S * 0.014), blur: S * 0.035,
-                  color: NSColor(srgbRed: 0.15, green: 0.10, blue: 0.35, alpha: 0.40).cgColor)
-    ctx.addPath(path); ctx.setFillColor(NSColor.white.cgColor); ctx.fillPath()
-    ctx.restoreGState()
-    ctx.saveGState(); ctx.addPath(path); ctx.clip()
-    let cs = CGColorSpaceCreateDeviceRGB(); let b = path.boundingBox
-    let g = CGGradient(colorsSpace: cs, colors: [
-        NSColor.white.cgColor, NSColor(white: 0.90, alpha: 1).cgColor,
-        NSColor(srgbRed: 0.86, green: 0.90, blue: 1.0, alpha: 1).cgColor] as CFArray, locations: [0, 0.6, 1])!
-    ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: b.maxY), end: CGPoint(x: 0, y: b.minY), options: [])
-    let gloss = CGGradient(colorsSpace: cs, colors: [
-        NSColor.white.withAlphaComponent(0.9).cgColor,
-        NSColor.white.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1])!
-    ctx.drawLinearGradient(gloss, start: CGPoint(x: 0, y: b.maxY), end: CGPoint(x: 0, y: b.maxY - b.height * 0.45), options: [])
-    ctx.restoreGState()
-}
-
-// A bold archery arrow — capsule shaft, triangular head, and two swept feathers at the nock. Tuned
-// to stay legible when drawn small and monochrome (it doubles as the menu-bar glyph).
-func arrowGlyph(_ S: CGFloat) -> CGPath {
-    let cx = S / 2, sw = S * 0.105
-    let yNock = S * 0.12, yTip = S * 0.88, yHeadBase = S * 0.60, hw = S * 0.205
+// A bold archery arrow — shaft, head, and two swept feathers — sized to fill most of the icon.
+func arrowPath(_ S: CGFloat) -> CGPath {
+    let cx = S / 2, sw = S * 0.13
+    let yNock = S * 0.135, yTip = S * 0.90, yHeadBase = S * 0.55, hw = S * 0.25
     let p = CGMutablePath()
-    p.addRoundedRect(in: CGRect(x: cx - sw / 2, y: yNock, width: sw, height: yHeadBase - yNock + S * 0.03),
+    p.addRoundedRect(in: CGRect(x: cx - sw / 2, y: yNock, width: sw, height: yHeadBase - yNock + S * 0.04),
                      cornerWidth: sw / 2, cornerHeight: sw / 2)
     let head = CGMutablePath()
     head.move(to: CGPoint(x: cx, y: yTip))
@@ -78,27 +28,62 @@ func arrowGlyph(_ S: CGFloat) -> CGPath {
     head.addLine(to: CGPoint(x: cx + hw, y: yHeadBase)); head.closeSubpath()
     p.addPath(head)
     for s in [CGFloat(-1), 1] {
-        let inX = cx + s * sw * 0.30
+        let inX = cx + s * sw * 0.32
         let f = CGMutablePath()
-        f.move(to: CGPoint(x: inX, y: yNock + S * 0.33))
-        f.addLine(to: CGPoint(x: cx + s * (sw * 0.30 + S * 0.165), y: yNock + S * 0.15))
-        f.addLine(to: CGPoint(x: cx + s * (sw * 0.30 + S * 0.165), y: yNock - S * 0.01))
-        f.addLine(to: CGPoint(x: inX, y: yNock + S * 0.07)); f.closeSubpath()
+        f.move(to: CGPoint(x: inX, y: yNock + S * 0.40))
+        f.addLine(to: CGPoint(x: cx + s * (sw * 0.32 + S * 0.20), y: yNock + S * 0.17))
+        f.addLine(to: CGPoint(x: cx + s * (sw * 0.32 + S * 0.20), y: yNock - S * 0.005))
+        f.addLine(to: CGPoint(x: inX, y: yNock + S * 0.08)); f.closeSubpath()
         p.addPath(f)
     }
     return p
 }
 
-func drawArrow(_ ctx: CGContext, _ S: CGFloat) {
-    glassFill(ctx, arrowGlyph(S), S)
-}
-
 let image = NSImage(size: NSSize(width: size, height: size))
 image.lockFocus()
 guard let ctx = NSGraphicsContext.current?.cgContext else { exit(1) }
-background(ctx, size)
-drawArrow(ctx, size)
-sheenStreak(ctx, size)
+let S = size
+let rect = CGRect(x: 0, y: 0, width: S, height: S)
+let rad = S * 0.225
+let cs = CGColorSpaceCreateDeviceRGB()
+
+let glowColor = C(94, 108, 255)
+
+// Near-black squircle with a soft accent glow behind the arrow.
+ctx.saveGState()
+ctx.addPath(squircle(rect, rad)); ctx.clip()
+let bg = CGGradient(colorsSpace: cs, colors: [C(40, 40, 52).cgColor, C(10, 10, 15).cgColor] as CFArray, locations: [0, 1])!
+ctx.drawLinearGradient(bg, start: CGPoint(x: S * 0.2, y: S * 0.95), end: CGPoint(x: S * 0.85, y: S * 0.05), options: [])
+let glow = CGGradient(colorsSpace: cs, colors: [glowColor.withAlphaComponent(0.55).cgColor, glowColor.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1])!
+ctx.drawRadialGradient(glow, startCenter: CGPoint(x: S * 0.5, y: S * 0.54), startRadius: 0,
+                       endCenter: CGPoint(x: S * 0.5, y: S * 0.54), endRadius: S * 0.52, options: [])
+ctx.restoreGState()
+
+let arrow = arrowPath(S)
+let b = arrow.boundingBox
+
+// Glowing halo around the arrow.
+ctx.saveGState()
+ctx.setShadow(offset: .zero, blur: S * 0.055, color: glowColor.withAlphaComponent(0.95).cgColor)
+ctx.addPath(arrow); ctx.setFillColor(NSColor.white.cgColor); ctx.fillPath()
+ctx.restoreGState()
+
+// Vibrant gradient fill + a top gloss.
+ctx.saveGState()
+ctx.addPath(arrow); ctx.clip()
+let ag = CGGradient(colorsSpace: cs, colors: [C(170, 224, 255).cgColor, C(74, 141, 255).cgColor, C(150, 92, 255).cgColor] as CFArray, locations: [0, 0.5, 1])!
+ctx.drawLinearGradient(ag, start: CGPoint(x: b.minX, y: b.maxY), end: CGPoint(x: b.maxX, y: b.minY), options: [])
+let gloss = CGGradient(colorsSpace: cs, colors: [NSColor.white.withAlphaComponent(0.5).cgColor, NSColor.white.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1])!
+ctx.drawLinearGradient(gloss, start: CGPoint(x: 0, y: b.maxY), end: CGPoint(x: 0, y: b.maxY - b.height * 0.4), options: [])
+ctx.restoreGState()
+
+// Thin inner-edge highlight for a premium glass rim.
+ctx.saveGState()
+ctx.addPath(squircle(rect, rad)); ctx.clip()
+ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.14).cgColor); ctx.setLineWidth(S * 0.005)
+ctx.addPath(squircle(rect.insetBy(dx: S * 0.012, dy: S * 0.012), rad * 0.96)); ctx.strokePath()
+ctx.restoreGState()
+
 image.unlockFocus()
 
 guard

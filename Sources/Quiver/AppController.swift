@@ -311,41 +311,20 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // MARK: Status item appearance
 
-    /// Quiver's mark: a bold archery arrow (matching the app icon). Drawn in a `flipped:false`
-    /// coordinate space (y-up) so it can be reused for both the app icon and this glyph.
-    static func arrowGlyphPath(_ S: CGFloat) -> CGPath {
-        let cx = S / 2, sw = S * 0.105
-        let yNock = S * 0.12, yTip = S * 0.88, yHeadBase = S * 0.60, hw = S * 0.205
-        let p = CGMutablePath()
-        p.addRoundedRect(in: CGRect(x: cx - sw / 2, y: yNock, width: sw, height: yHeadBase - yNock + S * 0.03),
-                         cornerWidth: sw / 2, cornerHeight: sw / 2)
-        let head = CGMutablePath()
-        head.move(to: CGPoint(x: cx, y: yTip))
-        head.addLine(to: CGPoint(x: cx - hw, y: yHeadBase))
-        head.addLine(to: CGPoint(x: cx + hw, y: yHeadBase)); head.closeSubpath()
-        p.addPath(head)
-        for s in [CGFloat(-1), 1] {
-            let inX = cx + s * sw * 0.30
-            let f = CGMutablePath()
-            f.move(to: CGPoint(x: inX, y: yNock + S * 0.33))
-            f.addLine(to: CGPoint(x: cx + s * (sw * 0.30 + S * 0.165), y: yNock + S * 0.15))
-            f.addLine(to: CGPoint(x: cx + s * (sw * 0.30 + S * 0.165), y: yNock - S * 0.01))
-            f.addLine(to: CGPoint(x: inX, y: yNock + S * 0.07)); f.closeSubpath()
-            p.addPath(f)
-        }
-        return p
-    }
-
-    // A template image redrawn per display scale (crisp on Retina), recolored by the system.
+    // The menu-bar glyph: a grouped-panels symbol, as a template image the system recolors.
     private static let statusImage: NSImage = {
-        let pt: CGFloat = 18
-        let image = NSImage(size: NSSize(width: pt, height: pt), flipped: false) { rect in
-            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-            ctx.addPath(arrowGlyphPath(rect.width))
-            ctx.setFillColor(NSColor.black.cgColor)
-            ctx.fillPath()
-            return true
+        let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        if let image = NSImage(systemSymbolName: "rectangle.3.group.fill", accessibilityDescription: "Quiver")?
+            .withSymbolConfiguration(config) {
+            image.isTemplate = true
+            return image
         }
+        // Fallback: a simple drawn glyph.
+        let image = NSImage(size: NSSize(width: 18, height: 18))
+        image.lockFocus()
+        NSColor.black.setFill()
+        NSBezierPath(roundedRect: NSRect(x: 2, y: 2, width: 14, height: 14), xRadius: 3, yRadius: 3).fill()
+        image.unlockFocus()
         image.isTemplate = true
         return image
     }()
