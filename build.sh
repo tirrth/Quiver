@@ -40,28 +40,20 @@ fi
 
 ARCH_FLAGS=(); for a in ${=ARCHS}; do ARCH_FLAGS+=(-arch $a); done
 
-# ---------- AutoRaise engine (Objective-C++, optional until Phase C) ----------
-ENGINE_SRC="$ROOT_DIR/Sources/AutoRaiseEngine/AutoRaiseEngine.mm"
-BRIDGING_HEADER="$ROOT_DIR/Sources/AutoRaiseEngine/Quiver-Bridging-Header.h"
-ENGINE_OBJ=""
-SWIFT_ENGINE_ARGS=()
-ENGINE_FRAMEWORKS=()
-if [[ -f "$ENGINE_SRC" ]]; then
-  SKYLIGHT=0
-  [[ -d /System/Library/PrivateFrameworks/SkyLight.framework ]] && SKYLIGHT=1
-  ENGINE_OBJ="$BUILD_DIR/AutoRaiseEngine.o"
-  echo "Compiling AutoRaise engine (SkyLight=$SKYLIGHT, archs: $ARCHS)"
-  xcrun clang++ "${ARCH_FLAGS[@]}" -O2 -fobjc-arc -std=c++17 -Wall \
-    -mmacosx-version-min=$DEPLOY_TARGET \
-    -DOLD_ACTIVATION_METHOD -DEXPERIMENTAL_FOCUS_FIRST \
-    -D"NS_FORMAT_ARGUMENT(A)=" -D"SKYLIGHT_AVAILABLE=$SKYLIGHT" \
-    -F /System/Library/PrivateFrameworks \
-    -c "$ENGINE_SRC" -o "$ENGINE_OBJ"
-  SWIFT_ENGINE_ARGS=(-import-objc-header "$BRIDGING_HEADER")
-  # -lc++ links the C++ runtime the Objective-C++ engine needs.
-  ENGINE_FRAMEWORKS=(-lc++ -framework ApplicationServices -framework Carbon -F /System/Library/PrivateFrameworks)
-  (( SKYLIGHT == 1 )) && ENGINE_FRAMEWORKS+=(-framework SkyLight)
+# ---------- AutoRaise engine (pure Swift; under Sources/Quiver/Modules/AutoRaise/Engine) ----------
+# The engine talks to the AX subsystem and the SkyLight private framework, and uses the same
+# OLD_ACTIVATION_METHOD / FOCUS_FIRST build flags the original AutoRaise.mm did. FOCUS_FIRST is only
+# enabled when the SkyLight private framework is present (it provides the focus-only SPIs). The
+# engine sources are picked up by the Sources/Quiver/**/*.swift glob below.
+SKYLIGHT=0
+[[ -d /System/Library/PrivateFrameworks/SkyLight.framework ]] && SKYLIGHT=1
+ENGINE_FRAMEWORKS=(-framework ApplicationServices -framework Carbon)
+ENGINE_DEFINES=(-DOLD_ACTIVATION_METHOD)
+if (( SKYLIGHT == 1 )); then
+  ENGINE_FRAMEWORKS+=(-F /System/Library/PrivateFrameworks -framework SkyLight)
+  ENGINE_DEFINES+=(-DFOCUS_FIRST)
 fi
+echo "AutoRaise engine: Swift (SkyLight=$SKYLIGHT)"
 
 # ---------- Privileged Hosts helper (Swift, optional until Phase B) ----------
 HELPER_SRCS=( "$ROOT_DIR"/Sources/QuiverHelper/*.swift(N) )
@@ -89,9 +81,8 @@ APP_BINS=()
 for a in ${=ARCHS}; do
   out="$BUILD_DIR/$APP_NAME-$a"
   xcrun swiftc -target $a-apple-macos$DEPLOY_TARGET -parse-as-library -O \
-    "${SWIFT_ENGINE_ARGS[@]}" \
+    "${ENGINE_DEFINES[@]}" \
     "${APP_SWIFT_SRCS[@]}" \
-    ${ENGINE_OBJ:+$ENGINE_OBJ} \
     -framework AppKit -framework SwiftUI \
     "${ENGINE_FRAMEWORKS[@]}" \
     -o "$out"

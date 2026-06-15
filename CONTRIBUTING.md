@@ -29,8 +29,7 @@ picked up automatically.
 | Path | What's there |
 | --- | --- |
 | `Sources/Quiver/` | The app shell — menu bar, windows, settings, persistence, launch-at-login |
-| `Sources/Quiver/Modules/` | One self-contained folder per utility |
-| `Sources/AutoRaiseEngine/` | The Objective-C++ window-raise engine (GPLv3) + bridging header |
+| `Sources/Quiver/Modules/` | One self-contained folder per utility (the GPLv3 AutoRaise window-raise engine lives in `Modules/AutoRaise/Engine/`, ported to Swift) |
 | `Sources/QuiverHelper/` | A small root-owned helper for passwordless `/etc/hosts` writes |
 | `App/` | `Info.plist`, entitlements |
 

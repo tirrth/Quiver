@@ -7,12 +7,13 @@ Quiver is a combined work that builds on the following projects.
 - Author: **sbmpost** — https://github.com/sbmpost/AutoRaise
 - License: **GNU General Public License v3** (see [LICENSE.md](LICENSE.md))
 - Use in Quiver: the focus-follows-mouse engine in
-  [Sources/AutoRaiseEngine/AutoRaiseEngine.mm](Sources/AutoRaiseEngine/AutoRaiseEngine.mm) is taken
-  from AutoRaise's `AutoRaise.mm`. The window-detection, event-tap, mouse-warp, and raise/focus hot
-  path is preserved as-is; only the application entry point (`main`), the standalone status-item
-  controller, and the config-file reader were removed and replaced with a `start(config:)`/`stop()`
-  lifecycle so Quiver can toggle it. Some pieces of AutoRaise are themselves based on `metamove` by
-  jmgao and `yabai` by koekeishiya.
+  [Sources/Quiver/Modules/AutoRaise/Engine/AutoRaiseEngine.swift](Sources/Quiver/Modules/AutoRaise/Engine/AutoRaiseEngine.swift)
+  is a behaviour-preserving Swift port of AutoRaise's `AutoRaise.mm`. The window-detection,
+  event-tap, mouse-warp, and raise/focus hot path (including the experimental focus-first path) is
+  translated faithfully and kept functionally identical; only the application entry point (`main`),
+  the standalone status-item controller, and the config-file reader were removed and replaced with a
+  `start(config:)`/`stop()` lifecycle so Quiver can toggle it. Some pieces of AutoRaise are
+  themselves based on `metamove` by jmgao and `yabai` by koekeishiya.
 
 Because AutoRaise is GPLv3, **Quiver as a whole is distributed under the GPLv3.**
 

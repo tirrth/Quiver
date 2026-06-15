@@ -95,8 +95,7 @@ The shell handles persistence, the menu bar, windows, launch-at-login, and error
 
 ```text
 Sources/Quiver/            Swift app shell (AppController, ModuleManager, UI, AppSettings, LoginItem)
-Sources/Quiver/Modules/    one self-contained folder per utility
-Sources/AutoRaiseEngine/   Objective-C++ window-raise engine (the GPLv3 AutoRaise engine) + bridging header
+Sources/Quiver/Modules/    one self-contained folder per utility (incl. the GPLv3 AutoRaise window-raise engine, ported to Swift, in AutoRaise/Engine/)
 Sources/QuiverHelper/      Root-owned helper for passwordless /etc/hosts writes
 App/                       Info.plist, entitlements
 scripts/                   Icon generator, DMG packager
