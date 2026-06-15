@@ -53,6 +53,10 @@ final class MirrorModule: UtilityModule {
 
     func openMirror() { controller.toggle() }
 
+    // A left-click on Glance Me's pinned menu-bar icon opens the camera directly.
+    override var menuBarActivatesDirectly: Bool { true }
+    override func menuBarActivate(near rect: CGRect) { controller.toggle(anchor: rect) }
+
     override var statusSummary: String {
         switch controller.authorization {
         case .denied, .restricted: return "Camera access needed"

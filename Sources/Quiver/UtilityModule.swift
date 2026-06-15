@@ -121,4 +121,14 @@ class UtilityModule: ObservableObject, Identifiable {
 
     /// Full settings pane shown in the main window's detail area.
     func makeSettingsView() -> AnyView { AnyView(EmptyView()) }
+
+    // MARK: Pinned menu-bar item
+
+    /// Whether a left-click on this module's pinned menu-bar icon performs a direct action instead of
+    /// opening its options menu. Override together with `menuBarActivate()`.
+    var menuBarActivatesDirectly: Bool { false }
+
+    /// The direct left-click action for a pinned menu-bar icon, given the icon's screen `rect`
+    /// (e.g. open the camera just below it).
+    func menuBarActivate(near rect: CGRect) {}
 }

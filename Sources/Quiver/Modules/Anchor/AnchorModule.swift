@@ -211,6 +211,10 @@ final class AnchorModule: UtilityModule {
         return gap > 0 ? "On · \(gap)px gap" : "On · shortcuts active"
     }
 
+    override func makeQuickControls() -> AnyView? {
+        AnyView(AnchorQuickControls(module: self))
+    }
+
     override func makeSettingsView() -> AnyView {
         AnyView(AnchorSettingsView(module: self))
     }

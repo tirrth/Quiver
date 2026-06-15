@@ -11,6 +11,8 @@ final class MirrorController: NSObject, ObservableObject {
     private let sessionQueue = DispatchQueue(label: "com.tirth.quiver.mirror.session")
     private var panel: NSPanel?
     private var escMonitor: Any?
+    private var clickMonitor: Any?
+    private var pendingAnchor: NSRect?
     private var prefix = "module.mirror"
 
     @Published private(set) var mirrored = true
@@ -77,9 +79,10 @@ final class MirrorController: NSObject, ObservableObject {
 
     // MARK: Open / close
 
-    func toggle() { isOpen ? close() : open() }
+    func toggle(anchor: NSRect? = nil) { isOpen ? close() : open(anchor: anchor) }
 
-    func open() {
+    func open(anchor: NSRect? = nil) {
+        pendingAnchor = anchor
         switch authorization {
         case .authorized:
             reallyOpen()
@@ -109,6 +112,7 @@ final class MirrorController: NSObject, ObservableObject {
     func close() {
         stopSession()
         if let escMonitor { NSEvent.removeMonitor(escMonitor); self.escMonitor = nil }
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor); self.clickMonitor = nil }
         panel?.orderOut(nil)
         isOpen = false
     }
@@ -136,9 +140,10 @@ final class MirrorController: NSObject, ObservableObject {
         if let panel { return panel }
         let p = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 340, height: 255),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered, defer: false
         )
+        p.minSize = NSSize(width: 160, height: 120)
         p.isMovable = true
         p.isMovableByWindowBackground = true
         p.level = .floating
@@ -160,13 +165,24 @@ final class MirrorController: NSObject, ObservableObject {
         let p = ensurePanel()
         let wasVisible = p.isVisible
         sizePanel(animate: false)
-        if !wasVisible, let screen = screenUnderMouse() {
+        if !wasVisible {
             let s = size.dimensions(circle: shape == .circle)
-            p.setFrameOrigin(NSPoint(x: screen.visibleFrame.midX - s.width / 2,
-                                     y: screen.visibleFrame.midY - s.height / 2))
+            if let anchor = pendingAnchor {
+                // Open just below the menu-bar icon, clamped to the screen.
+                let screen = NSScreen.screens.first { NSMouseInRect(NSPoint(x: anchor.midX, y: anchor.midY), $0.frame, false) } ?? NSScreen.main
+                var x = anchor.midX - s.width / 2
+                if let vf = screen?.visibleFrame {
+                    x = min(max(x, vf.minX + 8), vf.maxX - s.width - 8)
+                }
+                p.setFrameTopLeftPoint(NSPoint(x: x, y: anchor.minY - 4))
+            } else if let screen = screenUnderMouse() {
+                p.setFrameOrigin(NSPoint(x: screen.visibleFrame.midX - s.width / 2,
+                                         y: screen.visibleFrame.midY - s.height / 2))
+            }
         }
         p.orderFrontRegardless()
         installEscMonitor()
+        installClickMonitor()
     }
 
     private func sizePanel(animate: Bool) {
@@ -177,6 +193,7 @@ final class MirrorController: NSObject, ObservableObject {
         frame.origin.x += (frame.width - s.width) / 2
         frame.origin.y += (frame.height - s.height) / 2
         frame.size = s
+        p.contentAspectRatio = s   // keep the shape's ratio while the user drags to resize
         p.setFrame(frame, display: true, animate: animate)
     }
 
@@ -185,6 +202,15 @@ final class MirrorController: NSObject, ObservableObject {
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 { self?.close(); return nil }   // Esc
             return event
+        }
+    }
+
+    private func installClickMonitor() {
+        guard clickMonitor == nil else { return }
+        // A click outside the panel (another app or the desktop) dismisses it. Global monitors don't
+        // fire for our own clicks, so interacting with — or resizing — the panel keeps it open.
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.close()
         }
     }
 

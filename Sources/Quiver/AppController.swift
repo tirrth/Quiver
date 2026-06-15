@@ -7,7 +7,7 @@ import SwiftUI
 /// colors (an "on" switch renders white instead of accent, non-deterministically per draw). Returning
 /// false from `allowsVibrancy` is the documented way for a subview of a visual-effect view to stop
 /// vibrancy, so the hub's controls draw with their true colors.
-private final class NonVibrantHostingView<Content: View>: NSHostingView<Content> {
+final class NonVibrantHostingView<Content: View>: NSHostingView<Content> {
     override var allowsVibrancy: Bool { false }
 }
 
@@ -15,19 +15,23 @@ private final class NonVibrantHostingView<Content: View>: NSHostingView<Content>
 /// settings window, and app lifecycle. It drives
 /// an arbitrary set of `UtilityModule`s instead of one hard-coded feature.
 @MainActor
-final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     let manager: ModuleManager
     let settings = AppSettings()
     let uiState = AppUIState()
 
     private let launchesInBackground: Bool
     private var statusItem: NSStatusItem?
-    /// The hub shown on left-click is a system NSMenu hosting the SwiftUI hub. Letting the system own
-    /// the menu gives the native menu-bar highlight, click-away dismissal and no popover arrow for free.
-    private var activeHubMenu: NSMenu?
+    /// The hub is a system NSMenu hosting the SwiftUI hub, assigned to `statusItem.menu` permanently so
+    /// the system manages menu-bar tracking — native highlight, click-away dismissal, no arrow, and
+    /// single-click hand-off to other status items. Its content is built lazily in `menuNeedsUpdate`.
+    private let hubMenu = NSMenu()
+    private var hubHosting: NSView?
+    private let menuBarCoordinator = MenuBarCoordinator()
     private var pendingMenuAction: (() -> Void)?
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
+    private var pinnedItems: PinnedStatusItems!
     private var allowsTermination = false
     private var permissionTimer: Timer?
 
@@ -62,6 +66,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         settings.syncOnLaunch()
         manager.restoreAll()
         updateStatusButton()
+        configurePinnedItems()
         startPermissionTimer()
 
         // Register the system-wide "Add to Quiver Drop Deck" Service so it appears in any app's right-click
@@ -166,28 +171,36 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         item.button?.image = Self.statusImage
         item.button?.imagePosition = .imageOnly
         item.button?.toolTip = "Quiver"
-        item.button?.target = self
-        item.button?.action = #selector(statusButtonClicked(_:))
-        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        // Permanent menu (built lazily in menuNeedsUpdate) so the system manages menu-bar tracking and
+        // hands off to other status items — ours and the system's — in a single click.
+        hubMenu.delegate = self
+        buildHubMenu()
+        item.menu = hubMenu
         statusItem = item
+        menuBarCoordinator.register(
+            button: { [weak self] in self?.statusItem?.button },
+            open: { [weak self] in self?.statusItem?.button?.performClick(nil) }
+        )
     }
 
-    @objc private func statusButtonClicked(_ sender: NSStatusBarButton) {
-        if let event = NSApp.currentEvent, event.type == .rightMouseUp {
-            showContextMenu(from: sender)
-        } else {
-            showHubMenu(from: sender)
+    /// Creates the per-module menu-bar items for pinned utilities, and keeps them in sync.
+    private func configurePinnedItems() {
+        pinnedItems = PinnedStatusItems(
+            manager: manager,
+            openModule: { [weak self] id in self?.uiState.selectedModuleID = id; self?.showMainWindow() },
+            openSettings: { [weak self] in self?.showSettingsWindow() },
+            coordinator: menuBarCoordinator
+        )
+        manager.onPinsChanged = { [weak self] in
+            Task { @MainActor in self?.pinnedItems?.sync() }
         }
+        pinnedItems.sync()
     }
 
-    /// Shows the hub as a system NSMenu anchored under the icon: the status item highlights natively,
-    /// it dismisses on click-away, and there's no popover arrow. The SwiftUI hub is hosted in a single
-    /// menu item; `performClick` runs the menu modally until it closes.
-    private func showHubMenu(from button: NSStatusBarButton) {
-        refreshModulePermissions()
-
-        let menu = NSMenu()
-        let item = NSMenuItem()
+    /// Builds the hub's SwiftUI content once. It's reactive (observes the manager/settings), so it
+    /// stays current without rebuilding — and the menu is always populated, so the system can hand off
+    /// to it in a single click while another menu is open.
+    private func buildHubMenu() {
         let hosting = NonVibrantHostingView(rootView: HubPopoverView(
             manager: manager,
             settings: settings,
@@ -204,66 +217,41 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // appearance so its controls draw with normal colors.
         hosting.appearance = NSApp.effectiveAppearance
         hosting.setFrameSize(hosting.fittingSize)
+        hubHosting = hosting
+        let item = NSMenuItem()
         item.view = hosting
-        menu.addItem(item)
-
-        activeHubMenu = menu
-        statusItem?.menu = menu
-        button.performClick(nil)     // shows the menu (native highlight + dismissal); blocks until closed
-        statusItem?.menu = nil
-        activeHubMenu = nil
-
-        let action = pendingMenuAction
-        pendingMenuAction = nil
-        action?()
+        hubMenu.removeAllItems()
+        hubMenu.addItem(item)
     }
 
-    /// Closes the hub menu, then runs `action` once it has fully dismissed (so windows open cleanly).
+    /// Refreshes permission state and keeps the hosted view sized/appearance-pinned — without
+    /// rebuilding it, so the menu is never momentarily empty during a hand-off.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === hubMenu else { return }
+        refreshModulePermissions()
+        hubHosting?.appearance = NSApp.effectiveAppearance
+        if let hosting = hubHosting { hosting.setFrameSize(hosting.fittingSize) }
+    }
+
+    /// Runs a hub action (open a window, quit…) after the menu has fully dismissed, so windows open cleanly.
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu === hubMenu else { return }
+        if let action = pendingMenuAction {
+            pendingMenuAction = nil
+            action()
+        } else {
+            // No in-menu action chosen — if the cursor is over another of our icons, hand off to it.
+            menuBarCoordinator.openItemUnderCursor(excluding: statusItem?.button)
+        }
+    }
+
     private func dismissHubMenu(then action: @escaping () -> Void) {
         pendingMenuAction = action
-        activeHubMenu?.cancelTracking()
+        hubMenu.cancelTracking()
     }
 
     private func closePopover() {
-        activeHubMenu?.cancelTracking()
-    }
-
-    /// Simple right-click fallback menu mirroring the popover toggles.
-    private func showContextMenu(from button: NSStatusBarButton) {
-        let menu = NSMenu()
-        let header = NSMenuItem(title: "Quiver", action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        menu.addItem(header)
-        menu.addItem(.separator())
-
-        for module in manager.modules {
-            let item = NSMenuItem(title: module.title, action: #selector(toggleModuleFromMenu(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = module.id
-            item.state = module.isEnabled ? .on : .off
-            menu.addItem(item)
-        }
-
-        menu.addItem(.separator())
-        let open = NSMenuItem(title: "Open Quiver…", action: #selector(openMainFromMenu), keyEquivalent: "")
-        open.target = self
-        menu.addItem(open)
-        let prefs = NSMenuItem(title: "Settings…", action: #selector(openSettingsFromMenu), keyEquivalent: "")
-        prefs.target = self
-        menu.addItem(prefs)
-        menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit Quiver", action: #selector(quitCompletely), keyEquivalent: "")
-        quit.target = self
-        menu.addItem(quit)
-
-        statusItem?.menu = menu
-        button.performClick(nil)
-        statusItem?.menu = nil  // restore left-click popover behavior
-    }
-
-    @objc private func toggleModuleFromMenu(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String, let module = manager.module(id: id) else { return }
-        module.setEnabled(!module.isEnabled)
+        hubMenu.cancelTracking()
     }
 
     private func buildMainMenu() {

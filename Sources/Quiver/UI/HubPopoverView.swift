@@ -35,7 +35,7 @@ struct HubPopoverView: View {
 
             VStack(spacing: 1) {
                 ForEach(manager.menuModules) { module in
-                    ModuleRowView(module: module, onOpenModule: onOpenModule)
+                    ModuleRowView(module: module, manager: manager, onOpenModule: onOpenModule)
                         .onDrag { NSItemProvider(object: module.id as NSString) }
                         .onDrop(of: [.text], delegate: ModuleReorderDelegate(targetID: module.id, manager: manager))
                 }

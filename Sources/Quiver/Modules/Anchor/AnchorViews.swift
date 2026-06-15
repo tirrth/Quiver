@@ -1,6 +1,36 @@
 import SwiftUI
 import Carbon.HIToolbox
 
+/// Compact arrange buttons for Snap To's pinned menu-bar popover.
+struct AnchorQuickControls: View {
+    @ObservedObject var module: AnchorModule
+
+    private let rows: [[WindowAction]] = [
+        [.leftHalf, .rightHalf, .topHalf, .bottomHalf],
+        [.topLeft, .topRight, .bottomLeft, .bottomRight],
+        [.maximize, .fullScreen, .center, .restore]
+    ]
+
+    var body: some View {
+        VStack(spacing: 5) {
+            ForEach(rows.indices, id: \.self) { i in
+                HStack(spacing: 5) {
+                    ForEach(rows[i]) { action in
+                        Button { module.perform(action) } label: {
+                            Image(systemName: action.symbolName)
+                                .font(.system(size: 13)).frame(maxWidth: .infinity, minHeight: 28)
+                        }
+                        .buttonStyle(.bordered)
+                        .help(action.title)
+                    }
+                }
+            }
+        }
+        .disabled(!module.permission.isOK)
+        .opacity(module.permission.isOK ? 1 : 0.5)
+    }
+}
+
 /// Snap To's settings pane: click-to-arrange buttons, a gap picker, and an editable shortcut list.
 struct AnchorSettingsView: View {
     @ObservedObject var module: AnchorModule

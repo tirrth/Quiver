@@ -10,8 +10,13 @@ final class ModuleManager: ObservableObject {
     /// Persisted display order (module ids) and the set of modules hidden from the menu-bar hub.
     @Published private(set) var order: [String] = []
     @Published private(set) var hiddenIDs: Set<String> = []
+    @Published private(set) var pinnedIDs: Set<String> = []
     private static let orderKey = "modules.order"
     private static let hiddenKey = "modules.hidden"
+    private static let pinnedKey = "modules.pinned"
+
+    /// Called when the set of pinned (menu-bar) modules changes, so the shell can add/remove items.
+    var onPinsChanged: (() -> Void)?
 
     /// Called whenever any module reports a visible state change (used to refresh the menu bar).
     var onAnyStateChange: (() -> Void)?
@@ -26,6 +31,7 @@ final class ModuleManager: ObservableObject {
         for m in modules where !ord.contains(m.id) { ord.append(m.id) }
         self.order = ord
         self.hiddenIDs = Set(UserDefaults.standard.stringArray(forKey: Self.hiddenKey) ?? [])
+        self.pinnedIDs = Set(UserDefaults.standard.stringArray(forKey: Self.pinnedKey) ?? [])
         for module in modules {
             module.onStateChange = { [weak self] in
                 self?.objectWillChange.send()
@@ -75,6 +81,15 @@ final class ModuleManager: ObservableObject {
         if hidden { hiddenIDs.insert(id) } else { hiddenIDs.remove(id) }
         UserDefaults.standard.set(Array(hiddenIDs), forKey: Self.hiddenKey)
         onAnyStateChange?()
+    }
+
+    func isPinned(_ id: String) -> Bool { pinnedIDs.contains(id) }
+
+    /// Pin/unpin a module to its own menu-bar item.
+    func setPinned(_ id: String, _ pinned: Bool) {
+        if pinned { pinnedIDs.insert(id) } else { pinnedIDs.remove(id) }
+        UserDefaults.standard.set(Array(pinnedIDs), forKey: Self.pinnedKey)
+        onPinsChanged?()
     }
 
     /// Reorder for a SwiftUI List `.onMove`.
