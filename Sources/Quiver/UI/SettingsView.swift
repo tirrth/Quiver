@@ -98,7 +98,10 @@ struct GeneralSettingsContent: View {
 
             Card(title: "About") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Quiver").font(.headline)
+                    HStack(spacing: 9) {
+                        GemMark(size: 24)
+                        Text("Quiver").font(.system(size: 17, weight: .semibold))
+                    }
                     Text(appVersion).font(.caption).foregroundStyle(.secondary)
                     Text("A menu-bar hub for small Mac utilities you can flip on and off.")
                         .font(.caption).foregroundStyle(.secondary)

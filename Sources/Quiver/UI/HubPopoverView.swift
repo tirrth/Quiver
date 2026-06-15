@@ -55,10 +55,9 @@ struct HubPopoverView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "arrowshape.up.fill")
-                .font(.system(size: 13, weight: .bold)).foregroundStyle(Color.accentColor)
-            Text("Quiver").font(.system(size: 14, weight: .bold))
+        HStack(spacing: 9) {
+            GemMark(size: 22)
+            Text("Quiver").font(.system(size: 15, weight: .bold))
             Spacer()
             IconButton(symbol: "gearshape", help: "Settings", action: onOpenSettings)
         }

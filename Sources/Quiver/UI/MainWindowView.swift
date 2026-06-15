@@ -130,7 +130,14 @@ struct ModuleDetailView: View {
                     Toggle("", isOn: showInMenuBar).labelsHidden().toggleStyle(.switch)
                 }
                 .padding(14)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.04)))
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 1)
+                )
 
                 module.makeSettingsView()
             }
