@@ -53,6 +53,11 @@ final class MirrorModule: UtilityModule {
 
     func openMirror() { controller.toggle() }
 
+    // `person.crop.square` is the designed icon; it looks best a hair under full size, so its baseline
+    // (the Size slider's 100%) is 97%, with a small downward nudge to sit centred in its bounds.
+    override var symbolScale: CGFloat { 0.97 }
+    override var symbolYOffset: CGFloat { 0.8 }
+
     // A left-click on Glance Me's pinned menu-bar icon opens the camera directly.
     override var menuBarActivatesDirectly: Bool { true }
     override func menuBarActivate(near rect: CGRect) { controller.toggle(anchor: rect) }

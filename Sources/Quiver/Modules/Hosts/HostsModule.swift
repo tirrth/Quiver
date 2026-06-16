@@ -16,9 +16,9 @@ final class HostsModule: UtilityModule {
         passwordlessEnabled = PasswordlessHostsWriter.isInstalled
         super.init(
             id: "hosts",
-            title: "Waypoint",
+            title: "Reroute It",
             subtitle: "View, edit, enable/disable, add, and remove entries in /etc/hosts.",
-            symbolName: "network",
+            symbolName: "arrow.triangle.branch",
             isToggleable: false
         )
 

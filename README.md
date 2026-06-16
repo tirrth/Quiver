@@ -16,7 +16,7 @@ One app, several focused tools — instead of a separate menu-bar app for every 
 | **Follow Focus** | Raises and focuses the window under your pointer (focus-follows-mouse), with a configurable delay, hold-to-pause key, app exclusions, optional focus-first, and pointer-warp on app switch. | Accessibility |
 | **Drop Deck** | A floating tray: drop files, text, links, or images onto it, switch windows or Spaces, then drag them back out anywhere. Drop several at once and they collect into one stack. | None |
 | **Keep Awake** | Keeps your Mac from sleeping while on, with an optional auto-off timer and a "keep the display awake too" option. | None |
-| **Waypoint** | Toggle `/etc/hosts` entries on and off — and add, edit, or remove them — without opening Terminal. Optionally install a one-time helper so edits stop asking for your password. | Admin (on write) |
+| **Reroute It** | Toggle `/etc/hosts` entries on and off — and add, edit, or remove them — without opening Terminal. Optionally install a one-time helper so edits stop asking for your password. | Admin (on write) |
 | **Glance Me** | A quick webcam check before a call. The camera runs only while it's open. | Camera |
 
 ## Features
@@ -70,7 +70,7 @@ make clean
 On first launch, open the menu-bar popover and turn on the utilities you want:
 
 - **Follow Focus** → click **Grant Access** and enable Quiver under System Settings → Privacy & Security → Accessibility.
-- **Waypoint** → edits use the macOS admin prompt; optionally turn on **Passwordless writes** to approve once.
+- **Reroute It** → edits use the macOS admin prompt; optionally turn on **Passwordless writes** to approve once.
 - **Glance Me** → allow camera access when prompted.
 
 ## Contributing

@@ -239,7 +239,7 @@ final class ShelfStore: ObservableObject {
             proc.arguments = ["-j", "-q", zipURL.path] + files.map(\.path)   // -j flattens paths
             try? proc.run(); proc.waitUntilExit()
             if FileManager.default.fileExists(atPath: zipURL.path) {
-                await MainActor.run { self.add(urls: [zipURL]) }
+                await MainActor.run { _ = self.add(urls: [zipURL]) }
             }
         }
     }

@@ -58,7 +58,7 @@ private struct SidebarModuleLabel: View {
 
     var body: some View {
         HStack {
-            Label(module.title, systemImage: module.symbolName)
+            Label(module.title, systemImage: module.effectiveSymbolName)
             Spacer()
             if module.isToggleable {
                 Circle()
@@ -86,8 +86,9 @@ struct ModuleDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 14) {
-                    Image(systemName: module.symbolName)
-                        .font(.system(size: 26, weight: .medium))
+                    Image(systemName: module.effectiveSymbolName)
+                        .font(.system(size: 26 * module.effectiveSymbolScale, weight: .medium))
+                        .offset(y: module.effectiveSymbolYOffset * 2)   // detail icon is ~2× the hub-row size
                         .frame(width: 52, height: 52)
                         .foregroundStyle(module.isEnabled ? Color.accentColor : Color.secondary)
                         .background(
@@ -140,6 +141,21 @@ struct ModuleDetailView: View {
                 )
 
                 module.makeSettingsView()
+
+                Card(title: "Icon") {
+                    IconPicker(
+                        selectedSymbol: module.customSymbolName,
+                        defaultSymbolName: module.symbolName,
+                        scale: module.customSymbolScale ?? 1,
+                        baselineScale: module.iconBaselineScale,
+                        yOffset: module.effectiveSymbolYOffset,
+                        isModified: module.hasCustomIcon,
+                        onPick: { module.setCustomSymbol($0) },
+                        onScale: { module.setCustomSymbolScale($0) },
+                        onYOffset: { module.setCustomSymbolYOffset($0) },
+                        onReset: { module.resetIcon() }
+                    )
+                }
             }
             .padding(22)
             .frame(maxWidth: .infinity, alignment: .leading)

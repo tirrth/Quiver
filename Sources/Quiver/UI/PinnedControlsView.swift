@@ -14,7 +14,7 @@ struct PinnedControlsView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: module.symbolName)
+                Image(systemName: module.effectiveSymbolName)
                     .font(.system(size: 14, weight: .medium)).foregroundStyle(.secondary).frame(width: 22)
                 Text(module.title).font(.system(size: 13, weight: .semibold))
                 Spacer(minLength: 8)

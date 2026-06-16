@@ -65,7 +65,7 @@ struct GeneralSettingsContent: View {
                     HStack(spacing: 10) {
                         Image(systemName: "line.3.horizontal")
                             .font(.system(size: 12)).foregroundStyle(.tertiary)
-                        Image(systemName: module.symbolName)
+                        Image(systemName: module.effectiveSymbolName)
                             .font(.system(size: 13)).frame(width: 20).foregroundStyle(.secondary)
                         Text(module.title).font(.system(size: 13))
                         Spacer()
@@ -111,6 +111,25 @@ struct GeneralSettingsContent: View {
                         .font(.caption2).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+
+            Card(title: "Menu Bar Icon") {
+                Text("Choose the icon Quiver shows in the menu bar, or keep the gem. Resize and nudge it to taste.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                IconPicker(
+                    selectedSymbol: settings.menuBarIconSymbol,
+                    defaultSymbolName: nil,   // the Quiver default is the gem (drawn via GemMark)
+                    scale: settings.menuBarIconScale,
+                    baselineScale: 1,
+                    yOffset: settings.menuBarIconYOffset,
+                    isModified: settings.hasCustomMenuBarIcon,
+                    onPick: { settings.setMenuBarIconSymbol($0) },
+                    onScale: { settings.setMenuBarIconScale($0) },
+                    onYOffset: { settings.setMenuBarIconYOffset($0) },
+                    onReset: { settings.resetMenuBarIcon() }
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

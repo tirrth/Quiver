@@ -1,5 +1,35 @@
 import AppKit
 import SwiftUI
+import Combine
+
+/// Builds a template menu-bar glyph from an SF Symbol at a continuous size scale and vertical offset.
+/// Shared by the pinned-module icons and the Quiver app icon so both honour the icon picker's controls.
+enum MenuBarGlyph {
+    /// `scale` multiplies a base menu-bar point size; `yOffset` shifts the glyph (positive = down) by
+    /// padding the image (the status bar centres it). Returns nil only if the symbol doesn't exist.
+    static func symbolImage(_ name: String, scale: CGFloat, yOffset: CGFloat) -> NSImage? {
+        var base = NSImage(systemSymbolName: name, accessibilityDescription: nil)
+        if scale != 1 {
+            base = base?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 15 * scale, weight: .regular)) ?? base
+        }
+        guard let symbol = base else { return nil }
+        return offsetTemplate(symbol, yOffset: yOffset)
+    }
+
+    /// Wraps an image as a template, padding one edge so the status bar's centring nudges it up/down.
+    static func offsetTemplate(_ image: NSImage, yOffset: CGFloat) -> NSImage {
+        guard yOffset != 0 else { image.isTemplate = true; return image }
+        let size = image.size
+        let pad = abs(yOffset)
+        let glyphY: CGFloat = yOffset > 0 ? 0 : pad   // NSImage is y-up: y=0 is the bottom edge
+        let out = NSImage(size: NSSize(width: size.width, height: size.height + pad), flipped: false) { _ in
+            image.draw(in: NSRect(x: 0, y: glyphY, width: size.width, height: size.height))
+            return true
+        }
+        out.isTemplate = true
+        return out
+    }
+}
 
 /// One-click hand-off between Quiver's own menu-bar icons. macOS does this automatically for standard
 /// menus, but not for status items whose menus host a custom SwiftUI view — so when one of our menus
@@ -85,6 +115,7 @@ final class PinnedItemHandler: NSObject, NSMenuDelegate {
     private let controlsMenu = NSMenu()
     private var controlsHosting: NSView?
     private var pendingAction: (() -> Void)?
+    private var iconCancellable: AnyCancellable?
 
     init(module: UtilityModule, manager: ModuleManager,
          openModule: @escaping (String) -> Void,
@@ -98,11 +129,14 @@ final class PinnedItemHandler: NSObject, NSMenuDelegate {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
-        let image = NSImage(systemSymbolName: module.symbolName, accessibilityDescription: module.title)
-        image?.isTemplate = true
-        statusItem.button?.image = image
+        statusItem.button?.image = Self.menuBarImage(for: module)
         statusItem.button?.imagePosition = .imageOnly
         statusItem.button?.toolTip = module.title
+
+        // Re-stamp the menu-bar icon live when the module's icon (or any state) changes.
+        iconCancellable = module.objectWillChange.sink { [weak self] in
+            DispatchQueue.main.async { self?.refreshIcon() }
+        }
 
         if module.menuBarActivatesDirectly {
             // e.g. Glance Me opens the camera — a button action, not a menu.
@@ -125,6 +159,20 @@ final class PinnedItemHandler: NSObject, NSMenuDelegate {
     func dispose() {
         controlsMenu.cancelTracking()
         NSStatusBar.system.removeStatusItem(statusItem)
+    }
+
+    /// The menu-bar glyph for a pinned module, honouring its effective icon (the user's chosen glyph
+    /// or the built-in default) and the picker's size/offset.
+    private static func menuBarImage(for module: UtilityModule) -> NSImage? {
+        MenuBarGlyph.symbolImage(module.effectiveSymbolName,
+                                 scale: module.effectiveSymbolScale,
+                                 yOffset: module.effectiveSymbolYOffset)
+    }
+
+    private func refreshIcon() {
+        guard let module else { return }
+        statusItem.button?.image = Self.menuBarImage(for: module)
+        statusItem.button?.toolTip = module.title
     }
 
     private var module: UtilityModule? { manager.module(id: moduleId) }

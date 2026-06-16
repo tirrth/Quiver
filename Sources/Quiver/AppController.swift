@@ -33,6 +33,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     private var pinnedItems: PinnedStatusItems!
     private var allowsTermination = false
     private var permissionTimer: Timer?
+    private var cancellables = Set<AnyCancellable>()
 
     init(launchesInBackground: Bool) {
         self.launchesInBackground = launchesInBackground
@@ -52,7 +53,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
             HostsModule(),
             KeepAwakeModule(),
             ShelfModule(),
-            MirrorModule()
+            MirrorModule(),
+            EjectModule(),
+            SpeedTestModule(),
+            MetalHUDModule()
         ]
     }
 
@@ -67,6 +71,18 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         updateStatusButton()
         configurePinnedItems()
         startPermissionTimer()
+
+        // Re-stamp the Quiver menu-bar icon live when its settings change (separate from the permission
+        // timer's updateStatusButton(), which deliberately never re-stamps the image).
+        let iconChanges = [
+            settings.$menuBarIconSymbol.map { _ in () }.eraseToAnyPublisher(),
+            settings.$menuBarIconScale.map { _ in () }.eraseToAnyPublisher(),
+            settings.$menuBarIconYOffset.map { _ in () }.eraseToAnyPublisher()
+        ]
+        Publishers.MergeMany(iconChanges)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.refreshStatusIcon() }
+            .store(in: &cancellables)
 
         // Register the system-wide "Add to Quiver Drop Deck" Service so it appears in any app's right-click
         // → Services menu (the user may need to enable it in System Settings ▸ Keyboard ▸ Services).
@@ -148,7 +164,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
 
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = Self.statusImage
+        item.button?.image = currentStatusImage()
         item.button?.imagePosition = .imageOnly
         item.button?.toolTip = "Quiver"
         // Permanent menu (built lazily in menuNeedsUpdate) so the system manages menu-bar tracking and
@@ -304,17 +320,30 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
 
     // The menu-bar glyph: a faceted gem drawn as line-art, as a *template* image — so the system
     // recolours it (white on dark menu bars, black on light) to match the other menu-bar icons, while
-    // the facet lines keep it looking like a gem rather than a flat blob. Drawn per display scale.
-    private static let statusImage: NSImage = {
-        let pt: CGFloat = 18
-        let image = NSImage(size: NSSize(width: pt, height: pt), flipped: false) { rect in
+    // the facet lines keep it looking like a gem rather than a flat blob. Drawn at `18 * scale`.
+    private static func gemStatusImage(scale: CGFloat, yOffset: CGFloat) -> NSImage {
+        let pt: CGFloat = 18 * scale
+        let gem = NSImage(size: NSSize(width: pt, height: pt), flipped: false) { rect in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             drawMenuGem(in: rect, ctx: ctx)
             return true
         }
-        image.isTemplate = true
-        return image
-    }()
+        return MenuBarGlyph.offsetTemplate(gem, yOffset: yOffset)
+    }
+
+    /// The current Quiver menu-bar image: the user-chosen SF Symbol if set, otherwise the gem — both
+    /// sized/offset by the app-icon settings.
+    private func currentStatusImage() -> NSImage {
+        if let symbol = settings.menuBarIconSymbol,
+           let image = MenuBarGlyph.symbolImage(symbol, scale: settings.menuBarIconScale, yOffset: settings.menuBarIconYOffset) {
+            return image
+        }
+        return Self.gemStatusImage(scale: settings.menuBarIconScale, yOffset: settings.menuBarIconYOffset)
+    }
+
+    private func refreshStatusIcon() {
+        statusItem?.button?.image = currentStatusImage()
+    }
 
     /// The seven gem vertices (A,B,C,D,E,F,G) in an SxS box.
     private static func gemPoints(_ S: CGFloat) -> [CGPoint] {

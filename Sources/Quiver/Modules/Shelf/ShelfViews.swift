@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 /// Drives the system Quick Look panel for previewing a shelf item.
 @MainActor
-final class ShelfQuickLook: NSObject, QLPreviewPanelDataSource {
+final class ShelfQuickLook: NSObject, @MainActor QLPreviewPanelDataSource {
     static let shared = ShelfQuickLook()
     private var urls: [URL] = []
 

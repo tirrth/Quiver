@@ -24,9 +24,10 @@ struct ModuleRowView: View {
     var body: some View {
         HStack(spacing: 11) {
             HStack(spacing: 11) {
-                Image(systemName: module.symbolName)
-                    .font(.system(size: 13, weight: .medium))
+                Image(systemName: module.effectiveSymbolName)
+                    .font(.system(size: 13 * module.effectiveSymbolScale, weight: .medium))
                     .foregroundStyle(isActive ? Color.white : Color.secondary)
+                    .offset(y: module.effectiveSymbolYOffset)
                     .frame(width: 28, height: 28)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
