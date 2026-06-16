@@ -52,7 +52,20 @@ final class HubPanel {
         self.host = host
         self.panel = panel
 
-        anchorTopCenter = topCenterAnchor(for: button) ?? CGPoint(x: 0, y: 0)
+        if let anchor = topCenterAnchor(for: button) {
+            anchorTopCenter = anchor
+        } else {
+            // Status item not positioned yet (fresh launch): start centered at the top of the main screen,
+            // then retry once it settles so we land under the icon.
+            let vf = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+            anchorTopCenter = CGPoint(x: vf.midX, y: vf.maxY)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                guard let self, let button = self.anchorButton,
+                      let anchor = self.topCenterAnchor(for: button) else { return }
+                self.anchorTopCenter = anchor
+                self.relayout()
+            }
+        }
         positionPanel(size: size)
         // Tell the system a menu bar item is "tracking" so the menu bar stays revealed while we're open
         // on top of a full-screen app (where it would otherwise auto-hide). This is the technique system
@@ -94,19 +107,26 @@ final class HubPanel {
     private func topCenterAnchor(for button: NSStatusBarButton?) -> CGPoint? {
         guard let button, let window = button.window else { return nil }
         let frame = window.convertToScreen(button.convert(button.bounds, to: nil))
+        // Right after launch the status item may not be positioned yet — its frame lands off-screen.
+        // Only trust a frame that's actually in a menu bar (flush to the top edge of some screen);
+        // otherwise return nil so the caller falls back / retries.
+        guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(frame) }),
+              frame.maxY >= screen.frame.maxY - 4 else { return nil }
         return CGPoint(x: frame.midX, y: frame.minY - 6)   // just below the icon, horizontally centered
     }
 
     private func positionPanel(size: NSSize) {
         guard let panel else { return }
         let screen = NSScreen.screens.first { NSPointInRect(NSPoint(x: anchorTopCenter.x, y: anchorTopCenter.y), $0.frame) } ?? NSScreen.main
+        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         // Center the panel under the menu-bar icon; the content is centered within the panel (the
         // transparent shadow padding is symmetric), so the icon sits over the middle of the grid.
         var x = anchorTopCenter.x - size.width / 2
-        if let visible = screen?.visibleFrame {
-            x = min(max(x, visible.minX + 8), visible.maxX - size.width - 8)
-        }
-        let y = anchorTopCenter.y - size.height   // top edge fixed → grows downward
+        x = min(max(x, visible.minX + 8), visible.maxX - size.width - 8)
+        // Keep the whole panel on-screen vertically too — a safety net so a stale/off-screen anchor can
+        // never push it off the bottom (the pre-fix bug).
+        var y = anchorTopCenter.y - size.height   // top edge fixed → grows downward
+        y = min(max(y, visible.minY + 8), visible.maxY - size.height)
         panel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
     }
 
