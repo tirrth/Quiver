@@ -129,11 +129,9 @@ final class PinnedItemHandler: NSObject, NSMenuDelegate {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
-        statusItem.button?.image = Self.menuBarImage(for: module)
-        statusItem.button?.imagePosition = .imageOnly
-        statusItem.button?.toolTip = module.title
+        refreshIcon()
 
-        // Re-stamp the menu-bar icon live when the module's icon (or any state) changes.
+        // Re-stamp the menu-bar icon/readout live when the module's icon or state changes.
         iconCancellable = module.objectWillChange.sink { [weak self] in
             DispatchQueue.main.async { self?.refreshIcon() }
         }
@@ -169,10 +167,25 @@ final class PinnedItemHandler: NSObject, NSMenuDelegate {
                                  yOffset: module.effectiveSymbolYOffset)
     }
 
+    private var lastIconKey: String?
+
     private func refreshIcon() {
-        guard let module else { return }
-        statusItem.button?.image = Self.menuBarImage(for: module)
-        statusItem.button?.toolTip = module.title
+        guard let module, let button = statusItem.button else { return }
+        button.toolTip = module.title
+
+        // Rebuild the (expensive) symbol image only when the icon itself changed — a live readout (e.g.
+        // Net Speed) fires every second, and we don't want to re-stamp the image each tick.
+        let iconKey = "\(module.effectiveSymbolName)|\(module.effectiveSymbolScale)|\(module.effectiveSymbolYOffset)"
+        if iconKey != lastIconKey {
+            lastIconKey = iconKey
+            button.image = Self.menuBarImage(for: module)
+        }
+
+        // Live menu-bar text (e.g. the network speed). Empty → icon only.
+        let title = module.menuBarTitle ?? ""
+        button.title = title
+        button.imagePosition = title.isEmpty ? .imageOnly : .imageLeading
+        button.font = title.isEmpty ? nil : NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
     }
 
     private var module: UtilityModule? { manager.module(id: moduleId) }

@@ -11,9 +11,12 @@ final class ModuleManager: ObservableObject {
     @Published private(set) var order: [String] = []
     @Published private(set) var hiddenIDs: Set<String> = []
     @Published private(set) var pinnedIDs: Set<String> = []
+    /// Per-module Control-Center tile size (id → size); absent means the module's default.
+    @Published private(set) var tileSizes: [String: TileSize] = [:]
     private static let orderKey = "modules.order"
     private static let hiddenKey = "modules.hidden"
     private static let pinnedKey = "modules.pinned"
+    private static let tileSizesKey = "modules.tileSizes"
 
     /// Called when the set of pinned (menu-bar) modules changes, so the shell can add/remove items.
     var onPinsChanged: (() -> Void)?
@@ -32,6 +35,9 @@ final class ModuleManager: ObservableObject {
         self.order = ord
         self.hiddenIDs = Set(UserDefaults.standard.stringArray(forKey: Self.hiddenKey) ?? [])
         self.pinnedIDs = Set(UserDefaults.standard.stringArray(forKey: Self.pinnedKey) ?? [])
+        if let raw = UserDefaults.standard.dictionary(forKey: Self.tileSizesKey) as? [String: String] {
+            self.tileSizes = raw.compactMapValues { TileSize(rawValue: $0) }
+        }
         for module in modules {
             module.onStateChange = { [weak self] in
                 self?.objectWillChange.send()
@@ -80,6 +86,17 @@ final class ModuleManager: ObservableObject {
     func setHidden(_ id: String, _ hidden: Bool) {
         if hidden { hiddenIDs.insert(id) } else { hiddenIDs.remove(id) }
         UserDefaults.standard.set(Array(hiddenIDs), forKey: Self.hiddenKey)
+        onAnyStateChange?()
+    }
+
+    /// The tile size for a module — the user's choice, else the module's preferred default.
+    func tileSize(_ id: String) -> TileSize {
+        tileSizes[id] ?? module(id: id)?.defaultTileSize ?? .small
+    }
+
+    func setTileSize(_ id: String, _ size: TileSize) {
+        tileSizes[id] = size
+        UserDefaults.standard.set(tileSizes.mapValues { $0.rawValue }, forKey: Self.tileSizesKey)
         onAnyStateChange?()
     }
 

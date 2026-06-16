@@ -27,6 +27,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     /// single-click hand-off to other status items. Its content is built lazily in `menuNeedsUpdate`.
     private let hubMenu = NSMenu()
     private var hubHosting: NSView?
+    /// The Control-Center-style floating hub panel (replaces the old pop-down menu for the main icon).
+    private let hubPanel = HubPanel()
     private let menuBarCoordinator = MenuBarCoordinator()
     private var pendingMenuAction: (() -> Void)?
     private var mainWindow: NSWindow?
@@ -167,16 +169,45 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         item.button?.image = currentStatusImage()
         item.button?.imagePosition = .imageOnly
         item.button?.toolTip = "Quiver"
-        // Permanent menu (built lazily in menuNeedsUpdate) so the system manages menu-bar tracking and
-        // hands off to other status items — ours and the system's — in a single click.
-        hubMenu.delegate = self
-        buildHubMenu()
-        item.menu = hubMenu
+        // Clicking the icon toggles a floating Control-Center-style glass panel.
+        item.button?.target = self
+        item.button?.action = #selector(toggleHubPanel)
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         statusItem = item
+        hubPanel.onClose = { [weak self] in self?.statusItem?.button?.highlight(false) }
         menuBarCoordinator.register(
             button: { [weak self] in self?.statusItem?.button },
-            open: { [weak self] in self?.statusItem?.button?.performClick(nil) }
+            open: { [weak self] in self?.openHubPanel() }
         )
+    }
+
+    @objc private func toggleHubPanel() {
+        if hubPanel.isShown { hubPanel.close() } else { openHubPanel() }
+    }
+
+    private func openHubPanel() {
+        menuBarCoordinator.closeOpenPanels()    // close the camera / other transient panels
+        refreshModulePermissions()
+        hubPanel.show(hubContent(), below: statusItem?.button)
+        // Defer the highlight: the click that opened us ends with the button's own mouse-up, which
+        // clears the highlight — so set it on the next runloop tick to make it stick while open.
+        DispatchQueue.main.async { [weak self] in self?.statusItem?.button?.highlight(true) }
+    }
+
+    /// The hub's SwiftUI content for the floating panel. Actions close the panel first, then run.
+    private func hubContent() -> AnyView {
+        AnyView(HubGridView(
+            manager: manager,
+            settings: settings,
+            onOpenApp: { [weak self] in self?.hubPanel.close(); self?.showMainWindow() },
+            onOpenModule: { [weak self] id in
+                self?.hubPanel.close(); self?.uiState.selectedModuleID = id; self?.showMainWindow()
+            },
+            onOpenSettings: { [weak self] in self?.hubPanel.close(); self?.showSettingsWindow() },
+            onQuit: { [weak self] in self?.hubPanel.close(); self?.quitCompletely() },
+            onResize: { [weak self] in self?.hubPanel.relayout() },
+            inMenu: false
+        ))
     }
 
     /// Creates the per-module menu-bar items for pinned utilities, and keeps them in sync.
@@ -202,7 +233,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     /// stays current without rebuilding — and the menu is always populated, so the system can hand off
     /// to it in a single click while another menu is open.
     private func buildHubMenu() {
-        let hosting = NonVibrantHostingView(rootView: HubPopoverView(
+        let hosting = NonVibrantHostingView(rootView: HubGridView(
             manager: manager,
             settings: settings,
             onOpenApp: { [weak self] in self?.dismissHubMenu { self?.showMainWindow() } },
@@ -211,6 +242,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
             },
             onOpenSettings: { [weak self] in self?.dismissHubMenu { self?.showSettingsWindow() } },
             onQuit: { [weak self] in self?.dismissHubMenu { self?.quitCompletely() } },
+            onResize: { [weak self] in self?.repinHubSize() },
             inMenu: true
         ))
         // An NSMenu hosts its content with a vibrant material appearance, which desaturates controls
@@ -232,6 +264,14 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         refreshModulePermissions()
         hubHosting?.appearance = NSApp.effectiveAppearance
         if let hosting = hubHosting { hosting.setFrameSize(hosting.fittingSize) }
+    }
+
+    /// Re-measure the hosted hub view after its SwiftUI content changes height (Edit mode, resize,
+    /// add/remove) so the open NSMenu item grows/shrinks to fit instead of clipping.
+    private func repinHubSize() {
+        guard let hosting = hubHosting else { return }
+        hosting.setFrameSize(hosting.fittingSize)
+        hubMenu.items.first?.view = hosting
     }
 
     func menuWillOpen(_ menu: NSMenu) {

@@ -105,6 +105,10 @@ class UtilityModule: ObservableObject, Identifiable {
     /// switch and surface their controls without an enabled gate.
     let isToggleable: Bool
 
+    /// The Control-Center tile size this module looks best at by default (rich modules can prefer a
+    /// larger tile). Override to change; users can still resize. Defaults to small (1×1).
+    var defaultTileSize: TileSize { .small }
+
     /// Set by `ModuleManager`. Invoke (via `notifyChange()`) whenever user-visible state changes
     /// so the menu-bar status item and popover refresh.
     var onStateChange: (() -> Void)?
@@ -182,6 +186,10 @@ class UtilityModule: ObservableObject, Identifiable {
 
     /// One-line status shown in the menu (e.g. "On · delay 0ms").
     var statusSummary: String { isEnabled ? "On" : "Off" }
+
+    /// A live text label to show next to this module's pinned menu-bar icon (e.g. a network speed
+    /// readout). `nil` (the default) means icon-only. Refreshed whenever the module reports a change.
+    var menuBarTitle: String? { nil }
 
     /// Permission needed for the module to actually work.
     var permission: PermissionState { .ok }

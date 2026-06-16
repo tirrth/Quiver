@@ -1,32 +1,44 @@
 import Combine
 import SwiftUI
 
-/// A quick internet speed check (download, upload, latency) from the menu bar, powered by Cloudflare's
-/// public speed endpoints.
+/// Live network-speed monitor: while enabled, shows current download/upload throughput in real time
+/// (menu bar + popover). Also offers an on-demand full speed test (max capacity via Cloudflare).
 @MainActor
 final class SpeedTestModule: UtilityModule {
-    let service = SpeedTestService()
-    private var cancellable: AnyCancellable?
+    let monitor = NetworkMonitor()
+    let tester = SpeedTestService()
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
         super.init(
             id: "speedtest",
-            title: "Speed Test",
-            subtitle: "Check your internet download, upload, and latency without leaving the menu bar.",
+            title: "Net Speed",
+            subtitle: "Watch your live download and upload speed in the menu bar, and run a full speed test on demand.",
             symbolName: "gauge.with.dots.needle.50percent",
-            isToggleable: false
+            isToggleable: true
         )
-        service.onError = { [weak self] message in self?.reportError(message) }
-        cancellable = service.$state
+        tester.onError = { [weak self] message in self?.reportError(message) }
+        // Live monitor ticks → refresh the menu-bar readout + hub row each second.
+        monitor.$downloadMbps
             .sink { [weak self] _ in DispatchQueue.main.async { self?.notifyChange() } }
+            .store(in: &cancellables)
+        tester.$state
+            .sink { [weak self] _ in DispatchQueue.main.async { self?.notifyChange() } }
+            .store(in: &cancellables)
     }
 
+    override func start() { monitor.start() }
+    override func stop() { monitor.stop() }
+
     override var statusSummary: String {
-        if case .running(let phase) = service.state { return "Testing \(phase.rawValue.lowercased())…" }
-        if let result = service.lastResult {
-            return "↓ \(SpeedTestService.mbpsString(result.downloadMbps)) · ↑ \(SpeedTestService.mbpsString(result.uploadMbps)) Mbps"
-        }
-        return "Run a test"
+        guard isEnabled else { return "Off" }
+        return "↓ \(NetworkMonitor.rateString(monitor.downloadMbps)) · ↑ \(NetworkMonitor.rateString(monitor.uploadMbps))"
+    }
+
+    /// Compact live readout shown in the menu bar when enabled (and pinned).
+    override var menuBarTitle: String? {
+        guard isEnabled else { return nil }
+        return "↓\(NetworkMonitor.menuBarNumber(monitor.downloadMbps)) ↑\(NetworkMonitor.menuBarNumber(monitor.uploadMbps))"
     }
 
     override func makeQuickControls() -> AnyView? {

@@ -56,33 +56,8 @@ struct GeneralSettingsContent: View {
                 }
             }
 
-            Card(title: "Menu Bar") {
-                Text("Show or hide each utility in the menu, and drag to reorder them.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                ForEach(manager.orderedModules) { module in
-                    HStack(spacing: 10) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 12)).foregroundStyle(.tertiary)
-                        Image(systemName: module.effectiveSymbolName)
-                            .font(.system(size: 13)).frame(width: 20).foregroundStyle(.secondary)
-                        Text(module.title).font(.system(size: 13))
-                        Spacer()
-                        Toggle("", isOn: Binding(
-                            get: { !manager.isHidden(module.id) },
-                            set: { manager.setHidden(module.id, !$0) }
-                        ))
-                        .labelsHidden().toggleStyle(.switch).controlSize(.small)
-                    }
-                    .padding(.vertical, 3)
-                    .contentShape(Rectangle())
-                    .onDrag { NSItemProvider(object: module.id as NSString) }
-                    .onDrop(of: [.text], delegate: ModuleReorderDelegate(targetID: module.id, manager: manager))
-
-                    if module.id != manager.orderedModules.last?.id { Divider() }
-                }
-                .animation(.spring(response: 0.3, dampingFraction: 0.82), value: manager.order)
+            Card(title: "Controls") {
+                ControlEditorView(manager: manager)
             }
 
             Card(title: "Diagnostics") {
