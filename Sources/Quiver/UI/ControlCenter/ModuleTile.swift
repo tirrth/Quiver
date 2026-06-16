@@ -55,6 +55,7 @@ struct ModuleTileFace: View {
             let d = min(geo.size.width, geo.size.height)
             glyphImage(d * 0.42)
                 .frame(width: geo.size.width, height: geo.size.height)
+                .shadow(color: .black.opacity(0.28), radius: 1.5, y: 0.5)   // legibility on light glass
                 .background {
                     if isOn { Circle().fill(.white) } else { Color.clear.ccGlassCapsule() }
                 }
@@ -77,6 +78,7 @@ struct ModuleTileFace: View {
         }
         .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .shadow(color: .black.opacity(0.28), radius: 1.5, y: 0.5)   // legibility on light glass
         .ccGlassRect(26)
     }
 
@@ -98,6 +100,7 @@ struct ModuleTileFace: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .shadow(color: .black.opacity(0.28), radius: 1.5, y: 0.5)   // legibility on light glass
         .ccGlassRect(28)
     }
 }

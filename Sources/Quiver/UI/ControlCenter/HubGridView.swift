@@ -29,6 +29,7 @@ struct HubGridView: View {
         // The padding gives the drop shadow room around each floating element.
         content
             .padding(12)
+            .environment(\.colorScheme, .dark)   // white text/icons like Control Center
             // Re-measure the host whenever the content height changes (edit toggled, resize, add/remove).
             .background(GeometryReader { proxy in
                 Color.clear.onChange(of: proxy.size.height) { _ in onResize?() }
@@ -113,6 +114,7 @@ struct HubGridView: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 42)
+        .shadow(color: .black.opacity(0.28), radius: 1.5, y: 0.5)
         .ccGlassCapsule()
     }
 
@@ -127,6 +129,7 @@ struct HubGridView: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 36)
+        .shadow(color: .black.opacity(0.28), radius: 1.5, y: 0.5)
         .ccGlassCapsule()
     }
 }
