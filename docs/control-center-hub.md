@@ -22,9 +22,24 @@ SwiftUI `.background` (`Glass.swift`). Key facts, each verified by live screensh
   the desktop and windows behind it" — real Liquid Glass *and* wallpaper frosting. `NSVisualEffectView`
   is the older frosted vibrancy. (SwiftUI `glassEffect` *also* samples the desktop here and looks
   equivalent — it's a fine alternative — but `NSGlassEffectView` is what's shipped.)
-- **`style = .clear`, not `.regular`.** `.regular` renders a milky/opaque slab; `.clear` is the
-  translucent, wallpaper-showing Control Center look. (`NSGlassEffectViewStyle` is in the SDK header
-  `…/MacOSX*.sdk/…/AppKit.framework/Headers/NSGlassEffectView.h`.)
+- **`style = .clear` + a faint body fill + a bright edge rim** (the final, screenshot-tuned recipe). The
+  two NSGlassEffectView styles map out the whole space: `.regular` is **adaptive/frosted** — visible over a
+  light wallpaper but it **over-blurs** the backdrop (reads "too much blur" vs CC). `.clear` keeps the
+  wallpaper **crisp** (low blur, like CC) but on its own **vanishes over a light wallpaper** (no frost to
+  define it). So `GlassBackdrop` uses `.clear` for the crisp interior, plus a ~0.08 white fill (subtle body)
+  and a top-weighted white `strokeBorder` rim (~0.45→0.12) so each tile reads as a defined CC glass chip.
+  Verified over a tan-wallpaper backdrop matching the real CC reference. (`NSGlassEffectViewStyle` is in the
+  SDK header `…/AppKit.framework/Headers/NSGlassEffectView.h`.)
+- **Do NOT set the glass `appearance` manually.** ⚠️ Hard-won: forcing `view.appearance = .aqua` to "keep it
+  light" **over-frosted** it (milky/opaque) — Apple says explicitly *do not set appearance manually*
+  (WWDC25 310); the material adapts by sampling the backdrop, and pinning the appearance defeats that.
+- **`tintColor` does NOT fix a "too blue" cast cleanly** — the glass *samples the color behind it* by design;
+  CC just usually sits over a neutral desktop while our panel sits over a colored app. A neutral tint
+  desaturates but also dulls; the rim/fill recipe above is what was kept.
+- **Verify glass over a CONTROLLED backdrop, not the live desktop.** A helper window showing a wallpaper
+  image at `level = .popUpMenu - 1`, with the hub above it, lets you screenshot the glass over a known tone
+  (the live desktop is hidden behind full-screen apps here). Gotcha: the hub panel must out-rank that
+  backdrop — see the `isFloatingPanel`/level ordering note below, or the panel hides *behind* the backdrop.
 - **Corners** come from `NSGlassEffectView.cornerRadius` (no mask image). For the pre-26 fallback
   (`NSVisualEffectView`, `.behindWindow`), round with **`maskImage`, NOT `layer.cornerRadius` /
   `layer.masksToBounds`** — the latter disables the blur and renders the view fully transparent.
@@ -48,34 +63,57 @@ our dense grid**:
   would change this is grouping controls into shared rounded *regions* (like CC actually does) instead of
   individual circles — a layout redesign, not a glass tweak.
 
-## Keeping the menu bar pinned over fullscreen apps
+## Keeping the menu bar revealed over fullscreen apps — SOLVED via SkyLight (`MenuBarReveal`)
 
-Over a fullscreen app macOS auto-hides the menu bar. To keep it revealed while the panel is open,
-`HubPanel.show()` posts `com.apple.HIToolbox.beginMenuTrackingNotification` (and `…endMenuTracking…` on
-close) via `DistributedNotificationCenter`. It prevents an already-revealed bar from auto-hiding (it does
-not reveal a hidden one — in practice the user hovered the top to click the gem). Must be posted from the
-GUI app process (a CLI tool posting it has no effect).
+Over a full-screen app macOS auto-hides the menu bar, and a floating panel can't hold it via menu tracking
+(only a real `NSMenu` does — which is why the *pinned `statusItem.menu` items* keep it). The fix is the
+private **SkyLight** SPI `SLSSetMenuBarVisibilityOverrideOnDisplay(cid, displayID, true)` — the same call
+SketchyBar uses (`src/misc/extern.h`). `MenuBarReveal.reveal()` sets it on every active display when the hub
+opens; `restore()` clears it on close (and at launch, to recover from a crash). Verified by screencapture:
+the menu bar appears over a full-screen app while the hub is open and hides again on close.
 
-## Why the panel must never become key / activate the app
+- It's a **per-display visibility override**, NOT the global "Automatically hide the menu bar" preference
+  (`SLSSetMenuBarAutohideEnabled` would change that user setting — avoided). So it never touches System
+  Settings; it just forces visibility while open.
+- **OK to use a private SPI here:** Quiver is **not** App Store distributed (ad-hoc/local signing) and
+  **already links `SkyLight.framework`** (AutoRaise). Declared via `@_silgen_name` (the build is plain
+  `swiftc`, no bridging header). Guard against renames: a non-zero `CGError` is harmless (just no reveal).
+- `beginMenuTrackingNotification` heartbeat and the `.regular`+`NSApp.activate` flip were tried first and
+  **failed** (an event, not a state; and an active `.accessory` app has no menu bar — Apple FB13544993 — and
+  `.regular`+activate did not reveal the bar over a full-screen Space). Both removed. Don't re-attempt.
 
-Quiver is **`LSUIElement`** (agent app, no menu bar of its own). If the panel becomes the **key window**
-while the app is in `.accessory` mode, macOS makes the agent app the menu-bar owner and — finding no menu
-bar — **hides the whole system bar**. So the panel is a `.nonactivatingPanel` with
-`becomesKeyOnlyIfNeeded = true`, `hidesOnDeactivate = false`, shown via `orderFrontRegardless()`. Never
-call `NSApp.activate` for the panel. Controls still get clicks (nonactivating panels deliver mouse events
-without taking focus).
+## The one thing a floating panel still CANNOT do — the native highlight
 
-## Status-item icon highlight
-
-Manual: `statusItem.button.highlight(true)` on open / `false` on close — **deferred** with
-`DispatchQueue.main.async`, because the opening click's own mouse-up clears the highlight otherwise.
+The hub is a **nonactivating, never-key** `.borderless` panel (`orderFrontRegardless()`). The native
+status-item highlight needs the panel to be the **key** window — and a key window renders `NSGlassEffectView`
+**milky/opaque** instead of crisp/translucent (verified by back-to-back screenshots: key = milky, non-key =
+crisp). So the native highlight and crisp CC glass are mutually exclusive for the floating panel; crisp glass
+was chosen. The only way to get the highlight too is the `statusItem.menu = hubMenu` (NSMenu) path — which
+also gets native positioning for free, at the cost of the detached floating look.
 
 ## Panel positioning & sizing
 
 - Centered under the icon (top-center anchor, grows downward).
-- **Positioning bug fixed:** on a *fresh launch* the status item isn't positioned yet, so the anchor reads
-  off-screen and the panel could launch off-screen. `topCenterAnchor` now rejects a frame that isn't in a
-  menu bar; `positionPanel` clamps the panel fully on-screen; `show()` retries the anchor after 0.2s.
+- **"Is the gem in the menu bar?" test:** use `frame.midY >= screen.visibleFrame.maxY` (the button's center
+  is above the usable area). ⚠️ The old test `frame.maxY >= screen.frame.maxY - 4` was too tight for the
+  taller macOS 26/27 menu bar (the status item sits ~5.5pt below the top) — it failed *every* time, so the
+  anchor always fell back and the panel opened centered/on the wrong display instead of under the gem.
+- **Resolve the screen from `button.window?.screen`** and **carry it through** to `positionPanel` — never
+  re-derive via `NSScreen.main` (that pushed the panel onto the wrong display). The launch-race fallback
+  centers on `screenWithMouse()` (where the click happened), not `NSScreen.main`.
+- `positionPanel` clamps the panel fully on-screen against the *resolved* screen's `visibleFrame`; `show()`
+  retries the anchor after 0.2s for the fresh-launch race (status item not positioned yet).
+- **Level/spaces (don't "disappear" over apps):** set `isFloatingPanel = true` **before** `level = .popUpMenu`
+  — `isFloatingPanel` resets the level to `.floating`, so setting the level afterward keeps it at `.popUpMenu`
+  (above the menu bar). Use `collectionBehavior = [.fullScreenAuxiliary, .ignoresCycle, .moveToActiveSpace]`
+  (Ice's IceBar config). ⚠️ `.canJoinAllSpaces` and `.moveToActiveSpace` are mutually exclusive;
+  `.canJoinAllSpaces` stranded the panel on the desktop space, so over a full-screen app it "disappeared" —
+  `.moveToActiveSpace` brings it onto the current (incl. full-screen) space.
+- **Click-outside dismissal must hit-test the panel frame.** A global mouse-down monitor sees clicks posted
+  to *other* apps — and because the panel is nonactivating, clicks ON it are reported there too, so an
+  unconditional `close()` dismissed the panel on its own controls. Guard with
+  `if !panel.frame.contains(NSEvent.mouseLocation) { close() }`. (With the make-key change above, in-panel
+  clicks also keep the panel key, and `didResignKey` handles app-switch/outside dismissal.)
 - **Sizing:** `panel.contentViewController = host` (an `NSHostingController`); the panel is measured from
   `host.view.fittingSize`. **Do not** wrap the hosting view in custom `NSView`s — it couples `fittingSize`
   to the frame (position drift) and child-VC hosting renders transparent. (`NSHostingController.sizingOptions

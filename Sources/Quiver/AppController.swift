@@ -66,6 +66,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.verbose = settings.verboseLogging
+        MenuBarReveal.restore()   // clear any leftover menu-bar override from a previous crash
         buildMainMenu()
         configureStatusItem()
         settings.syncOnLaunch()
@@ -106,6 +107,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MenuBarReveal.restore()   // safety net: never leave the menu-bar auto-hide setting toggled on quit
         // Closing the app hides to the menu bar; only an explicit "Quit Quiver" fully exits.
         guard allowsTermination else {
             hideToMenuBar()
@@ -189,9 +191,6 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         menuBarCoordinator.closeOpenPanels()    // close the camera / other transient panels
         refreshModulePermissions()
         hubPanel.show(hubContent(), below: statusItem?.button)
-        // Defer the highlight: the click that opened us ends with the button's own mouse-up, which
-        // clears the highlight — so set it on the next runloop tick to make it stick while open.
-        DispatchQueue.main.async { [weak self] in self?.statusItem?.button?.highlight(true) }
     }
 
     /// The hub's SwiftUI content for the floating panel. Actions close the panel first, then run.

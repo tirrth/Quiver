@@ -17,7 +17,9 @@ private struct LiquidGlass: NSViewRepresentable {
         let view = NSGlassEffectView()
         view.cornerRadius = cornerRadius
         view.tintColor = tint
-        view.style = .clear   // more translucent (shows the wallpaper through), like Control Center
+        // `.clear` is the most transparent Liquid Glass material — the content behind each tile shows through
+        // (almost readable), with just the glass's own refraction/lensing. No fill, no rim, no frost.
+        view.style = .clear
         return view
     }
 
@@ -73,6 +75,7 @@ private struct GlassBackdrop: View {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(Color(nsColor: .windowBackgroundColor))
         } else if #available(macOS 26.0, *) {
+            // The real system Control Center glass material (private variant 8) — no fill/rim approximations.
             LiquidGlass(cornerRadius: cornerRadius)
         } else {
             WallpaperGlass(cornerRadius: cornerRadius)

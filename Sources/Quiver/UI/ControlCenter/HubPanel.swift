@@ -6,12 +6,13 @@ import SwiftUI
 /// edge fixed, growing downward) when its SwiftUI content changes height (Edit mode, resize, add/remove).
 @MainActor
 final class HubPanel {
-    private var panel: KeyablePanel?
+    private var panel: NSPanel?
     private weak var anchorButton: NSStatusBarButton?
     private var host: NSHostingController<AnyView>?
     private var clickMonitor: Any?
     private var escMonitor: Any?
     private var anchorTopCenter: CGPoint = .zero   // fixed top-center so the panel grows downward
+    private var anchorScreen: NSScreen?            // the screen the gem lives on (never re-guessed)
 
     /// Called when the panel closes (to drop the icon highlight).
     var onClose: (() -> Void)?
@@ -30,58 +31,61 @@ final class HubPanel {
         host.view.layoutSubtreeIfNeeded()
         let size = host.view.fittingSize
 
+        // Borderless glass panel. It becomes KEY on show so the status-item button renders its native
+        // highlight (highlight() only paints while the button's window is key). A borderless panel can only
+        // become key via the `canBecomeKey` override (KeyablePanel) — which makes us the active app. An
+        // active `.accessory` app has NO menu bar (Apple: Dock-icon-and-menu-bar, or neither), so the bar
+        // would collapse over another app; AppController flips us to `.regular` while the hub is open so we
+        // keep a menu bar (like the main window). (`.titled` was tried to become key WITHOUT activating, but
+        // its titlebar material makes the glass render milky — borderless keeps the crisp wallpaper look.)
         let panel = KeyablePanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
+        // Set `isFloatingPanel` BEFORE `level` — it resets the level to `.floating`, so setting the level
+        // afterward keeps the panel at `.popUpMenu` (above the menu bar / other floating windows).
+        panel.isFloatingPanel = true
         panel.level = .popUpMenu
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        // `.moveToActiveSpace` brings the panel onto the space the user is currently looking at — including
+        // a full-screen app's space (with `.fullScreenAuxiliary`). The old `.canJoinAllSpaces` stranded it
+        // on the desktop space, so over a full-screen app the panel "disappeared". (The two space flags are
+        // mutually exclusive; this matches Ice's IceBar config.)
+        panel.collectionBehavior = [.fullScreenAuxiliary, .ignoresCycle, .moveToActiveSpace]
         panel.isReleasedWhenClosed = false
-        // Quiver is an LSUIElement (agent) app with no menu bar of its own. If this panel ever became
-        // the key window while the app is in `.accessory` mode, macOS would make our agent app the
-        // menu-bar owner and — finding no menu bar — hide the whole system bar. So the panel must show
-        // without becoming key or activating the app: a nonactivating panel that only takes key focus
-        // if a control truly needs it (we have none), ordered front without activation. Controls still
-        // receive clicks (nonactivating panels deliver mouse events without stealing focus).
-        panel.becomesKeyOnlyIfNeeded = true
         panel.hidesOnDeactivate = false
         panel.contentViewController = host
 
         self.host = host
         self.panel = panel
 
-        if let anchor = topCenterAnchor(for: button) {
+        if let (anchor, screen) = topCenterAnchor(for: button) {
             anchorTopCenter = anchor
+            anchorScreen = screen
         } else {
-            // Status item not positioned yet (fresh launch): start centered at the top of the main screen,
-            // then retry once it settles so we land under the icon.
-            let vf = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-            anchorTopCenter = CGPoint(x: vf.midX, y: vf.maxY)
+            // Status item not positioned yet (fresh launch): provisionally center at the top of the screen
+            // *under the cursor* (where the click happened) — NOT NSScreen.main, which may be a different
+            // display than the one holding the gem. Then retry once the item settles to land under the icon.
+            let screen = screenWithMouse() ?? NSScreen.main
+            let vf = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+            anchorScreen = screen
+            anchorTopCenter = CGPoint(x: vf.midX, y: screen?.frame.maxY ?? vf.maxY)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
                 guard let self, let button = self.anchorButton,
-                      let anchor = self.topCenterAnchor(for: button) else { return }
+                      let (anchor, screen) = self.topCenterAnchor(for: button) else { return }
                 self.anchorTopCenter = anchor
+                self.anchorScreen = screen
                 self.relayout()
             }
         }
         positionPanel(size: size)
-        // Tell the system a menu bar item is "tracking" so the menu bar stays revealed while we're open
-        // on top of a full-screen app (where it would otherwise auto-hide). This is the technique system
-        // items / Control Center rely on; it lets our floating panel keep the bar pinned without being an
-        // actual NSMenu. Just a distributed-notification name — no private frameworks, degrades safely.
-        Self.postMenuTracking(begin: true)
+        // Keep the system menu bar revealed for the panel's lifetime — including over a full-screen app,
+        // where it auto-hides (a floating panel can't hold it via menu tracking). SkyLight SPI; restored on
+        // close. (We stay nonactivating + not key so the glass renders crisp — a key window makes it milky.)
+        MenuBarReveal.reveal()
         panel.orderFrontRegardless()
         installMonitors()
-    }
-
-    /// Posting `begin…` keeps the menu bar revealed over a full-screen app while the panel is open;
-    /// `end…` reverses it. (HIToolbox distributed notifications, the same ones real menu tracking posts.)
-    private static func postMenuTracking(begin: Bool) {
-        let name = begin ? "com.apple.HIToolbox.beginMenuTrackingNotification"
-                         : "com.apple.HIToolbox.endMenuTrackingNotification"
-        DistributedNotificationCenter.default().post(name: Notification.Name(name), object: nil)
     }
 
     /// Re-measure and resize, keeping the top-right corner fixed (grow downward like Control Center).
@@ -93,31 +97,46 @@ final class HubPanel {
     }
 
     func close() {
-        let wasShown = panel != nil
         removeMonitors()
         panel?.orderOut(nil)
         panel = nil
         host = nil
-        if wasShown { Self.postMenuTracking(begin: false) }   // release the menu-bar pin
+        MenuBarReveal.restore()   // put the user's menu-bar auto-hide setting back
         onClose?()
     }
 
     // MARK: Geometry
 
-    private func topCenterAnchor(for button: NSStatusBarButton?) -> CGPoint? {
+    /// The on-screen top-center point just below the gem, plus the screen it lives on. Returns nil while
+    /// the status item isn't yet positioned (its frame isn't flush to a menu bar), so the caller retries.
+    private func topCenterAnchor(for button: NSStatusBarButton?) -> (point: CGPoint, screen: NSScreen)? {
         guard let button, let window = button.window else { return nil }
         let frame = window.convertToScreen(button.convert(button.bounds, to: nil))
-        // Right after launch the status item may not be positioned yet — its frame lands off-screen.
-        // Only trust a frame that's actually in a menu bar (flush to the top edge of some screen);
-        // otherwise return nil so the caller falls back / retries.
-        guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(frame) }),
-              frame.maxY >= screen.frame.maxY - 4 else { return nil }
-        return CGPoint(x: frame.midX, y: frame.minY - 6)   // just below the icon, horizontally centered
+        // The screen must come from the *button's own window*, not a geometric search or NSScreen.main —
+        // that's what handles multi-display + notched layouts correctly (mirrors Ice / Apple DTS guidance).
+        guard let screen = window.screen ?? NSScreen.screens.first(where: { $0.frame.intersects(frame) }) else {
+            return nil
+        }
+        // The button is in the menu bar iff its vertical center sits above the screen's *visible* area
+        // (`visibleFrame` excludes the menu bar). This is geometry-derived, so it's correct on the taller
+        // macOS 26/27 bar and on notched displays — unlike the old "within 4pt of the very top" test, which
+        // failed on Tahoe (the status item is inset ~5.5pt from the top) and made the panel always fall back.
+        guard frame.midY >= screen.visibleFrame.maxY else { return nil }
+        let topY = min(frame.minY, screen.visibleFrame.maxY) - 6   // just below the bar / icon, CC-like gap
+        return (CGPoint(x: frame.midX, y: topY), screen)   // just below the icon, horizontally centered
+    }
+
+    /// The screen currently under the mouse (where the menu-bar click happened), for the launch-race fallback.
+    private func screenWithMouse() -> NSScreen? {
+        let loc = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(loc, $0.frame, false) }
     }
 
     private func positionPanel(size: NSSize) {
         guard let panel else { return }
-        let screen = NSScreen.screens.first { NSPointInRect(NSPoint(x: anchorTopCenter.x, y: anchorTopCenter.y), $0.frame) } ?? NSScreen.main
+        // Use the screen resolved when we took the anchor — never re-derive via NSScreen.main, which is the
+        // bug that pushed the panel onto the wrong display.
+        let screen = anchorScreen ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         // Center the panel under the menu-bar icon; the content is centered within the panel (the
         // transparent shadow padding is symmetric), so the icon sits over the middle of the grid.
@@ -133,8 +152,13 @@ final class HubPanel {
     // MARK: Dismissal
 
     private func installMonitors() {
+        // A global monitor sees mouse-downs the system posts to *other* apps. Because our panel is
+        // nonactivating (Quiver never becomes the active app), clicks ON the panel are ALSO reported here —
+        // so closing unconditionally would dismiss the panel on its own controls (and made it "disappear"
+        // the moment it opened over another app). Only close when the click is genuinely OUTSIDE the panel.
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.close()
+            guard let self, let panel = self.panel else { return }
+            if !panel.frame.contains(NSEvent.mouseLocation) { self.close() }
         }
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 { self?.close(); return nil }   // Esc
@@ -150,7 +174,8 @@ final class HubPanel {
     }
 }
 
-/// A borderless panel that can still become key, so the SwiftUI controls inside accept input.
+/// A borderless panel that can become key, so it shows the status-item highlight and its SwiftUI controls
+/// accept input. (Borderless windows can't become key without this override.)
 final class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
