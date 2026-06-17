@@ -40,6 +40,17 @@ private final class CCGlassView: NSGlassEffectView {
     }
 }
 
+/// `effectIsInteractive` drives the live specular "lensing" as content moves under the glass — the exact
+/// effect Control Center shows. It isn't declared on `NSGlassEffectView` in current SDKs, so set it via the
+/// runtime (guarded by `responds(to:)`) rather than a compile-time symbol: that keeps the build working on
+/// SDKs that lack it and silently enables it on OSes/SDKs that have it.
+@available(macOS 26.0, *)
+private func setEffectInteractive(_ view: NSGlassEffectView) {
+    let sel = NSSelectorFromString("setEffectIsInteractive:")
+    guard view.responds(to: sel) else { return }
+    view.setValue(true, forKey: "effectIsInteractive")
+}
+
 @available(macOS 26.0, *)
 private struct LiquidGlass: NSViewRepresentable {
     var cornerRadius: CGFloat
@@ -50,11 +61,7 @@ private struct LiquidGlass: NSViewRepresentable {
         view.cornerRadius = cornerRadius
         view.tintColor = tint
         view.applyControlCenterMaterial()
-        // The interactive flag drives the live specular "lensing" as content moves under the glass — the
-        // exact effect Control Center shows (and what made the earlier transparent build feel right).
-        if #available(macOS 27.0, *) {
-            view.effectIsInteractive = true
-        }
+        setEffectInteractive(view)
         return view
     }
 
@@ -62,9 +69,7 @@ private struct LiquidGlass: NSViewRepresentable {
         view.cornerRadius = cornerRadius
         view.tintColor = tint
         (view as? CCGlassView)?.applyControlCenterMaterial()
-        if #available(macOS 27.0, *) {
-            view.effectIsInteractive = true
-        }
+        setEffectInteractive(view)
     }
 }
 
