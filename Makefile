@@ -1,8 +1,13 @@
-.PHONY: all build install run dmg clean
+.PHONY: all build install run dmg clean xcode
 
 APP = build/Quiver.app
 
 all: build
+
+# Open the project in Xcode for editing / autocomplete / SwiftUI Previews.
+# (Editor only — the real signed app still comes from build.sh / `make build`.)
+xcode:
+	xed .
 
 # Compile Quiver.app into ./build
 build:

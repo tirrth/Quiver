@@ -6,6 +6,11 @@ build/
 *.dSYM/
 DerivedData/
 
+# SwiftPM / Xcode (Package.swift is editor-only; build.sh is the real build)
+.build/
+.swiftpm/
+Package.resolved
+
 # macOS
 .DS_Store
 
