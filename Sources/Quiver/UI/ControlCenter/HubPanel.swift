@@ -9,6 +9,7 @@ final class HubPanel {
     private var panel: NSPanel?
     private weak var anchorButton: NSStatusBarButton?
     private var host: NSHostingController<AnyView>?
+    private let backdrop = HubBackdrop()   // the CC-style background blur behind the panel
     private var clickMonitor: Any?
     private var escMonitor: Any?
     private var activationObserver: NSObjectProtocol?
@@ -83,7 +84,10 @@ final class HubPanel {
         // where it auto-hides (a floating panel can't hold it via menu tracking). SkyLight SPI; restored on
         // close. The panel is key for controls, but nonactivating and closed on app activation changes.
         MenuBarReveal.reveal()
+        // The CC-style background blur sits one window below the hub; order the hub directly above it.
+        if let screen = anchorScreen { backdrop.show(on: screen, hubFrame: panel.frame) }
         panel.makeKeyAndOrderFront(nil)
+        if let backdropNumber = backdrop.windowNumber { panel.order(.above, relativeTo: backdropNumber) }
         installMonitors()
     }
 
@@ -92,7 +96,7 @@ final class HubPanel {
         guard let panel, let host else { return }
         host.view.layoutSubtreeIfNeeded()
         positionPanel(size: host.view.fittingSize)
-        _ = panel
+        if let screen = anchorScreen { backdrop.update(on: screen, hubFrame: panel.frame) }
     }
 
     func close() {
@@ -102,6 +106,7 @@ final class HubPanel {
     private func close(notify: Bool) {
         removeMonitors()
         panel?.orderOut(nil)
+        backdrop.hide()
         panel = nil
         host = nil
         MenuBarReveal.restore()   // put the user's menu-bar auto-hide setting back

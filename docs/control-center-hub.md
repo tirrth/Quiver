@@ -72,6 +72,49 @@ SwiftUI `.background` (`Glass.swift`). Key facts, each verified by live screensh
   wallpapers through it. (Pixel check: CC tile ~189, ours ~190; CC gaps/margins are near-white ~244, so there
   is **no** strong full-panel "parent" scrim — the gray is the tiles + their soft shadows.)
 
+## The background blur (the CC backdrop) — `HubBackdrop`
+
+When the hub opens, real Control Center **blurs everything behind the panel** — the desktop *and other app
+windows* — strongest around the panel and **feathering to fully sharp** toward the screen edges, leaving the
+menu bar untouched. It's a **transparent** blur (you see the blurred content through it), **not** a milky or
+dark frost. `HubBackdrop` (`UI/ControlCenter/HubBackdrop.swift`) reproduces this. Verified by back-to-back
+captures against a live CC (open CC via AX, `screencapture` the display).
+
+- **Separate window, one level below the hub.** A behind-window blur only blurs what's rendered *behind its
+  own window*; the hub must stay crisp on top. So the blur lives in its own borderless, transparent,
+  `ignoresMouseEvents` `NSPanel` at `.popUpMenu`, ordered **below** the hub (the hub calls
+  `panel.order(.above, relativeTo: backdrop.windowNumber)`). Because it ignores mouse events, clicks pass
+  through and the hub's **existing** click-outside / app-activation dismissal works unchanged — no new
+  dismissal code. It covers `screen.visibleFrame` (below the menu bar, so the bar stays sharp) on the hub's
+  screen only (like CC).
+- **Pure, tint-free blur via private `CABackdropLayer` — NOT `NSVisualEffectView`.** ⭐ `NSVisualEffectView`
+  (any `.behindWindow` material) blurs behind-window content *reliably*, but **every material adds a tint** —
+  it came out a milky pink wash over our wallpaper (the "whitish blur" we don't want; verified by capture).
+  The real CC backdrop is a plain Gaussian with no color overlay. So we use the same primitive the system
+  uses: a `CABackdropLayer` with `windowServerAware = true` (captures behind-window content, not just
+  in-window) and a `CAFilter(name: "gaussianBlur")` (`inputRadius`). Both are private; guarded by
+  `responds(to:)` / `NSClassFromString` and **fail safe** to a masked `NSVisualEffectView` (functional, just
+  tinted). OK to use SPI here for the same reason as the glass (ad-hoc signed, already links private frameworks).
+- **Feather = a rounded-rect mask the *shape of the hub*, not a circle.** ⭐ Maintainer-requested: the halo
+  must trace the panel's outline with a little outside spacing, then fade — not bulge out as a disc. So the
+  mask is a filled rounded rect (the hub frame expanded by `featherInset`), **Gaussian-blurred** (CIImage)
+  so its edges feather to clear over ~`featherWidth`. Over-expand the fill by the blur's own spread (`+σ`)
+  so the full-strength plateau still covers hub+spacing after the blur eats inward. Set as the
+  `CABackdropLayer`'s `mask` (a `CALayer` whose `contents` is that image); the `NSVisualEffectView` fallback
+  takes the same image as `maskImage`. ⚠️ **Draw the mask top-down** (flip the `CGContext`: `translateBy y =
+  height; scaleBy 1,-1`) — both CALayer `contents` and `NSImage` read row 0 as the top, so a y-up image lands
+  the halo at the *bottom*. Render at point resolution (not ×backingScale) — it's a soft mask, plenty.
+  Tuning constants (blur radius, spacing, fade, corner) live at the top of `HubBackdrop`.
+- **Subtle dark dim (`dimOpacity`), like real CC.** A flat dark `CALayer` sits on top of the blur, clipped by
+  an **identical feather mask** (a *separate* mask `CALayer` with the same image — one CALayer mask can back
+  only one layer), so it darkens the same halo and fades out with the blur. Set to 0 to disable. The blur
+  itself is constant-strength; only the masks' alpha feathers. Kept gentle (maintainer: "not blackish").
+- **Edge cases handled:** Reduce Transparency → no backdrop at all (skip). Multi-display → only the hub's
+  screen; the launch-race reposition re-frames the window to the corrected screen (`update(on:hubFrame:)`,
+  not just re-feather). Resize/Edit-mode/add-remove → `relayout()` re-feathers around the new hub frame.
+  Fade in on open, fade out on close (then `orderOut`). Works on macOS < 26 too (CABackdropLayer is old SPI);
+  independent of the tiles' `NSGlassEffectView` 26+ gate.
+
 ## Tile-merging ("blob") — DO NOT re-attempt
 
 The Control Center "tiles meld into a blob" effect was investigated exhaustively and **does not work for
