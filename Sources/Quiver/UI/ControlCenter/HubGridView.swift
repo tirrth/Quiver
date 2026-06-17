@@ -17,7 +17,7 @@ struct HubGridView: View {
     // into the 3 inter-tile gaps (≈11.67pt each), so the tiles sit flush to the 295pt content edges.
     private let columns = 4
     private let hubWidth: CGFloat = 295
-    private let tileSide: CGFloat = 65
+    private let tileSide: CGFloat = 64
     private var tileSpacing: CGFloat { (hubWidth - tileSide * CGFloat(columns)) / CGFloat(columns - 1) }
 
     var body: some View {
