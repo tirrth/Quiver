@@ -126,9 +126,24 @@ private struct GlassBackdrop: View {
             // it's constant it also works over dark backdrops (no content-color flip, no Screen Recording).
             // The scrim is only 25% opaque, so the glass still samples + lenses colored wallpapers through it.
             LiquidGlass(cornerRadius: cornerRadius)
+                // Dim scrim, INSET by 1.5pt so the glass's own bright rim survives at the very edge (a full
+                // scrim flattens it — the "no white reflection over white" bug).
                 .overlay(
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(Color.black.opacity(0.25))
+                        .padding(0.5)
+                )
+                // Specular rim: real CC's Liquid-Glass refraction is brightest on the BOTTOM edge (light
+                // bends through to the lower curve), subtle on top — matched to a real-CC capture over white.
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(stops: [
+                                .init(color: .white.opacity(0.08), location: 0),
+                                .init(color: .white.opacity(0.02), location: 0.45),
+                                .init(color: .white.opacity(0.26), location: 1)
+                            ], startPoint: .top, endPoint: .bottom),
+                            lineWidth: 1.0)
                 )
         } else {
             WallpaperGlass(cornerRadius: cornerRadius)
