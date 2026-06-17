@@ -37,10 +37,12 @@ struct ModuleTileFace: View {
         }
     }
 
-    /// Inner icon circle for wide/large tiles: solid white (on) or a gray translucent fill (off).
+    /// Inner icon circle for wide/large tiles: solid white (on) or a lighter translucent disc (off).
+    /// Off opacity 0.27 matches real CC, whose OFF wide-control icon circle reads ~205 over a ~186 tile
+    /// (≈ white at 0.27) — measured from a real-CC capture; 0.16 read too faint.
     private func innerCircle(_ diameter: CGFloat) -> some View {
         ZStack {
-            Circle().fill(isOn ? Color.white : Color.primary.opacity(0.16))
+            Circle().fill(isOn ? Color.white : Color.primary.opacity(0.25))
             glyphImage(diameter * 0.50)
         }
         .frame(width: diameter, height: diameter)
