@@ -57,6 +57,14 @@ final class MirrorModule: UtilityModule {
     // (the Size slider's 100%) is 97%, with a small downward nudge to sit centred in its bounds.
     override var symbolScale: CGFloat { 0.97 }
     override var symbolYOffset: CGFloat { 0.8 }
+    override var defaultTileSize: TileSize { .small }
+    override var controlCenterTitle: String { "Mirror" }
+    override var controlCenterStatusSummary: String {
+        switch controller.authorization {
+        case .denied, .restricted: return "Needs access"
+        default: return controller.isOpen ? "Open" : "Camera"
+        }
+    }
 
     // A left-click on Glance Me's pinned menu-bar icon opens the camera directly.
     override var menuBarActivatesDirectly: Bool { true }

@@ -41,7 +41,7 @@ struct ModuleTileFace: View {
     private func innerCircle(_ diameter: CGFloat) -> some View {
         ZStack {
             Circle().fill(isOn ? Color.white : Color.primary.opacity(0.16))
-            glyphImage(diameter * 0.46)
+            glyphImage(diameter * 0.50)
         }
         .frame(width: diameter, height: diameter)
         .overlay(alignment: .topTrailing) { attentionBadge.offset(x: 2, y: -2) }
@@ -53,11 +53,17 @@ struct ModuleTileFace: View {
     private var small: some View {
         GeometryReader { geo in
             let d = min(geo.size.width, geo.size.height)
-            glyphImage(d * 0.42)
+            glyphImage(d * 0.40)   // measured against real CC: 1×1 glyph ≈ 0.50 of its circle (~33pt in a 65pt tile)
                 .frame(width: geo.size.width, height: geo.size.height)
                 .shadow(color: .black.opacity(0.28), radius: 1.5, y: 0.5)   // legibility on light glass
                 .background {
-                    if isOn { Circle().fill(.white) } else { Color.clear.ccGlassCapsule() }
+                    if isOn {
+                        Circle()
+                            .fill(.white)
+                            .overlay(Circle().strokeBorder(Color.white.opacity(0.45), lineWidth: 1))
+                    } else {
+                        Color.clear.ccGlassCapsule()
+                    }
                 }
                 .overlay(alignment: .topTrailing) { attentionBadge.offset(x: -d * 0.16, y: d * 0.16) }
         }
@@ -66,12 +72,20 @@ struct ModuleTileFace: View {
     /// 2×1 — frosted glass squircle: icon circle on the left, name + status to the right.
     private var wide: some View {
         HStack(spacing: 12) {
-            innerCircle(52)
+            innerCircle(42)   // measured against real CC: the wide-control icon circle is ~44pt (in a ~63pt tile)
             VStack(alignment: .leading, spacing: 1) {
-                Text(module.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary).lineLimit(1)
-                let status = module.statusSummary
-                if !status.isEmpty && status != "Off" {
-                    Text(status).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+                Text(module.controlCenterTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                let status = module.controlCenterStatusSummary
+                if !status.isEmpty {
+                    Text(status)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.74)
                 }
             }
             Spacer(minLength: 0)
@@ -79,18 +93,18 @@ struct ModuleTileFace: View {
         .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .shadow(color: .black.opacity(0.28), radius: 1.5, y: 0.5)   // legibility on light glass
-        .ccGlassRect(26)
+        .ccGlassCapsule()
     }
 
     /// 2×2 — frosted glass squircle: icon circle, name, then embedded controls (or status).
     private var large: some View {
         VStack(alignment: .leading, spacing: 8) {
             innerCircle(46)
-            Text(module.title).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary).lineLimit(1)
+            Text(module.controlCenterTitle).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary).lineLimit(1)
             if let controls = module.makeQuickControls() {
                 controls.allowsHitTesting(interactive)
             } else {
-                let status = module.statusSummary
+                let status = module.controlCenterStatusSummary
                 if !status.isEmpty {
                     Text(status).font(.system(size: 12)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)

@@ -82,6 +82,7 @@ final class AutoRaiseModule: UtilityModule {
     }
 
     var focusFirstAvailable: Bool { AutoRaiseEngine.focusFirstAvailable }
+    override var defaultTileSize: TileSize { .wide }
 
     /// Modes actually selectable on this machine.
     var availableModes: [RaiseMode] {
@@ -211,6 +212,20 @@ final class AutoRaiseModule: UtilityModule {
     }
 
     // MARK: Presentation
+
+    override var controlCenterTitle: String { "Focus" }
+    override var controlCenterStatusSummary: String {
+        guard isEnabled else { return "Off" }
+        if !AutoRaiseEngine.isAccessibilityTrusted() { return "Needs access" }
+        switch (focusFirstAvailable ? mode : .raiseOnHover) {
+        case .raiseOnHover:
+            return raiseDelayMillis <= 0 ? "Instant" : "\(raiseDelayMillis) ms"
+        case .focusThenRaise:
+            return "Focus first"
+        case .focusOnly:
+            return "Focus only"
+        }
+    }
 
     override var statusSummary: String {
         guard isEnabled else { return "Off" }

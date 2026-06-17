@@ -170,13 +170,18 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = currentStatusImage()
         item.button?.imagePosition = .imageOnly
+        if let cell = item.button?.cell as? NSButtonCell {
+            cell.highlightsBy = [.contentsCellMask, .changeBackgroundCellMask]
+        }
         item.button?.toolTip = "Quiver"
         // Clicking the icon toggles a floating Control-Center-style glass panel.
         item.button?.target = self
         item.button?.action = #selector(toggleHubPanel)
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         statusItem = item
-        hubPanel.onClose = { [weak self] in self?.statusItem?.button?.highlight(false) }
+        hubPanel.onClose = { [weak self] in
+            self?.setStatusIconHighlighted(false)
+        }
         menuBarCoordinator.register(
             button: { [weak self] in self?.statusItem?.button },
             open: { [weak self] in self?.openHubPanel() }
@@ -190,20 +195,18 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     private func openHubPanel() {
         menuBarCoordinator.closeOpenPanels()    // close the camera / other transient panels
         refreshModulePermissions()
+        setStatusIconHighlighted(true)
         hubPanel.show(hubContent(), below: statusItem?.button)
+        setStatusIconHighlighted(true)
     }
 
     /// The hub's SwiftUI content for the floating panel. Actions close the panel first, then run.
     private func hubContent() -> AnyView {
         AnyView(HubGridView(
             manager: manager,
-            settings: settings,
-            onOpenApp: { [weak self] in self?.hubPanel.close(); self?.showMainWindow() },
             onOpenModule: { [weak self] id in
                 self?.hubPanel.close(); self?.uiState.selectedModuleID = id; self?.showMainWindow()
             },
-            onOpenSettings: { [weak self] in self?.hubPanel.close(); self?.showSettingsWindow() },
-            onQuit: { [weak self] in self?.hubPanel.close(); self?.quitCompletely() },
             onResize: { [weak self] in self?.hubPanel.relayout() },
             inMenu: false
         ))
@@ -234,13 +237,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     private func buildHubMenu() {
         let hosting = NonVibrantHostingView(rootView: HubGridView(
             manager: manager,
-            settings: settings,
-            onOpenApp: { [weak self] in self?.dismissHubMenu { self?.showMainWindow() } },
             onOpenModule: { [weak self] id in
                 self?.dismissHubMenu { self?.uiState.selectedModuleID = id; self?.showMainWindow() }
             },
-            onOpenSettings: { [weak self] in self?.dismissHubMenu { self?.showSettingsWindow() } },
-            onQuit: { [weak self] in self?.dismissHubMenu { self?.quitCompletely() } },
             onResize: { [weak self] in self?.repinHubSize() },
             inMenu: true
         ))
@@ -380,8 +379,57 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         return Self.gemStatusImage(scale: settings.menuBarIconScale, yOffset: settings.menuBarIconYOffset)
     }
 
+    /// A non-template selected-state status image. NSStatusBarButton's normal highlight drawing is tied
+    /// to menu tracking/key-window behavior, so the floating nonactivating panel uses an image that
+    /// carries the native selected pill with the icon centered inside it.
+    private func highlightedStatusImage() -> NSImage {
+        let glyphSide = 18 * settings.menuBarIconScale
+        let symbolName = settings.menuBarIconSymbol
+        let symbolPointSize = 15 * settings.menuBarIconScale
+        let yOffset = settings.menuBarIconYOffset
+        let width = max(CGFloat(44), glyphSide + 24)
+        let height: CGFloat = 26
+        let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
+            NSColor.white.withAlphaComponent(0.22).setFill()
+            NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 13, yRadius: 13).fill()
+
+            let glyphRect = NSRect(
+                x: rect.midX - glyphSide / 2,
+                y: rect.midY - glyphSide / 2 - yOffset,
+                width: glyphSide,
+                height: glyphSide
+            )
+            if let symbol = symbolName,
+               let symbolImage = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: symbolPointSize, weight: .regular)) {
+                symbolImage.isTemplate = true
+                NSColor.white.set()
+                symbolImage.draw(in: glyphRect)
+            } else if let ctx = NSGraphicsContext.current?.cgContext {
+                Self.drawMenuGem(in: glyphRect, ctx: ctx, color: .white)
+            }
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
+    private func setStatusIconHighlighted(_ highlighted: Bool) {
+        guard let item = statusItem else { return }
+        if highlighted {
+            let image = highlightedStatusImage()
+            item.length = max(44, image.size.width)
+            item.button?.image = image
+            item.button?.highlight(true)
+        } else {
+            item.length = NSStatusItem.variableLength
+            item.button?.image = currentStatusImage()
+            item.button?.highlight(false)
+        }
+    }
+
     private func refreshStatusIcon() {
-        statusItem?.button?.image = currentStatusImage()
+        setStatusIconHighlighted(hubPanel.isShown)
     }
 
     /// The seven gem vertices (A,B,C,D,E,F,G) in an SxS box.
@@ -395,7 +443,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         ]
     }
 
-    private static func drawMenuGem(in rect: CGRect, ctx: CGContext) {
+    private static func drawMenuGem(in rect: CGRect, ctx: CGContext, color: NSColor = .black) {
         let unit: CGFloat = 100
         let bb = gemOutlinePath(unit).boundingBox
         let avail = rect.insetBy(dx: rect.width * 0.08, dy: rect.height * 0.08)
@@ -404,7 +452,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         ctx.translateBy(x: avail.midX - bb.midX * scale, y: avail.midY - bb.midY * scale)
         ctx.scaleBy(x: scale, y: scale)
         let p = gemPoints(unit)
-        ctx.setStrokeColor(NSColor.black.cgColor)   // colour is ignored for a template; only the shape matters
+        ctx.setStrokeColor(color.cgColor)   // black is ignored for a template; highlighted images pass white.
         ctx.setLineWidth(unit * 0.052)
         ctx.setLineJoin(.round); ctx.setLineCap(.round)
         ctx.addPath(gemOutlinePath(unit)); ctx.strokePath()

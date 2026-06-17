@@ -11,6 +11,7 @@ final class HubPanel {
     private var host: NSHostingController<AnyView>?
     private var clickMonitor: Any?
     private var escMonitor: Any?
+    private var activationObserver: NSObjectProtocol?
     private var anchorTopCenter: CGPoint = .zero   // fixed top-center so the panel grows downward
     private var anchorScreen: NSScreen?            // the screen the gem lives on (never re-guessed)
 
@@ -24,26 +25,24 @@ final class HubPanel {
     }
 
     func show(_ content: AnyView, below button: NSStatusBarButton?) {
-        close()
+        close(notify: false)
         anchorButton = button
+        button?.highlight(true)
 
         let host = NSHostingController(rootView: content)
         host.view.layoutSubtreeIfNeeded()
         let size = host.view.fittingSize
 
-        // Borderless glass panel. It becomes KEY on show so the status-item button renders its native
-        // highlight (highlight() only paints while the button's window is key). A borderless panel can only
-        // become key via the `canBecomeKey` override (KeyablePanel) — which makes us the active app. An
-        // active `.accessory` app has NO menu bar (Apple: Dock-icon-and-menu-bar, or neither), so the bar
-        // would collapse over another app; AppController flips us to `.regular` while the hub is open so we
-        // keep a menu bar (like the main window). (`.titled` was tried to become key WITHOUT activating, but
-        // its titlebar material makes the glass render milky — borderless keeps the crisp wallpaper look.)
-        let panel = KeyablePanel(
+        // Borderless, nonactivating glass panel. It becomes key so SwiftUI controls receive clicks, but
+        // never becomes a main app window; when another app activates, we close it immediately so the
+        // glass never lingers in an inactive/frosted recipe.
+        let panel = ControlCenterPanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
+        panel.becomesKeyOnlyIfNeeded = true
         // Set `isFloatingPanel` BEFORE `level` — it resets the level to `.floating`, so setting the level
         // afterward keeps the panel at `.popUpMenu` (above the menu bar / other floating windows).
         panel.isFloatingPanel = true
@@ -82,9 +81,9 @@ final class HubPanel {
         positionPanel(size: size)
         // Keep the system menu bar revealed for the panel's lifetime — including over a full-screen app,
         // where it auto-hides (a floating panel can't hold it via menu tracking). SkyLight SPI; restored on
-        // close. (We stay nonactivating + not key so the glass renders crisp — a key window makes it milky.)
+        // close. The panel is key for controls, but nonactivating and closed on app activation changes.
         MenuBarReveal.reveal()
-        panel.orderFrontRegardless()
+        panel.makeKeyAndOrderFront(nil)
         installMonitors()
     }
 
@@ -97,12 +96,16 @@ final class HubPanel {
     }
 
     func close() {
+        close(notify: true)
+    }
+
+    private func close(notify: Bool) {
         removeMonitors()
         panel?.orderOut(nil)
         panel = nil
         host = nil
         MenuBarReveal.restore()   // put the user's menu-bar auto-hide setting back
-        onClose?()
+        if notify { onClose?() }
     }
 
     // MARK: Geometry
@@ -164,18 +167,31 @@ final class HubPanel {
             if event.keyCode == 53 { self?.close(); return nil }   // Esc
             return event
         }
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            if app?.bundleIdentifier != Bundle.main.bundleIdentifier {
+                Task { @MainActor in self?.close() }
+            }
+        }
     }
 
     private func removeMonitors() {
         if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
         if let escMonitor { NSEvent.removeMonitor(escMonitor) }
+        if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
         clickMonitor = nil
         escMonitor = nil
+        activationObserver = nil
     }
 }
 
-/// A borderless panel that can become key, so it shows the status-item highlight and its SwiftUI controls
-/// accept input. (Borderless windows can't become key without this override.)
-final class KeyablePanel: NSPanel {
+/// A borderless Control-Center panel that can receive control clicks without turning into a main app
+/// window. The hub closes on app activation changes, so it does not remain visible as inactive glass.
+final class ControlCenterPanel: NSPanel {
     override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
 }

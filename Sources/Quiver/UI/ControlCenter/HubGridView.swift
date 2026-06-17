@@ -1,15 +1,11 @@
 import SwiftUI
 
-/// The menu-bar hub, styled like Control Center: a glassy grid of resizable module tiles with a tidy
-/// header and footer, plus an in-place Edit mode (rearrange, resize, add, remove).
+/// The menu-bar hub, styled like Control Center: a glassy grid of resizable module tiles with a compact
+/// bottom edit/action row, plus an in-place Edit mode (rearrange, resize, add, remove).
 struct HubGridView: View {
     @ObservedObject var manager: ModuleManager
-    @ObservedObject var settings: AppSettings
 
-    let onOpenApp: () -> Void
     let onOpenModule: (String) -> Void
-    let onOpenSettings: () -> Void
-    let onQuit: () -> Void
     /// Called when the content's height changes so the host can re-measure the NSMenu item.
     var onResize: (() -> Void)?
     /// Hosted inside an NSMenu — the menu supplies the background/rounding, so we drop our own card chrome.
@@ -28,7 +24,8 @@ struct HubGridView: View {
         // No enclosing container — like Control Center, the tiles and chrome float on the desktop.
         // The padding gives the drop shadow room around each floating element.
         content
-            .padding(12)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .environment(\.colorScheme, .dark)   // white text/icons like Control Center
             // Re-measure the host whenever the content height changes (edit toggled, resize, add/remove).
             .background(GeometryReader { proxy in
@@ -38,10 +35,9 @@ struct HubGridView: View {
 
     private var content: some View {
         VStack(spacing: 10) {
-            header
             grid
             if editing { addTray }
-            footer
+            actionBar
         }
         .frame(width: hubWidth)
         .fixedSize(horizontal: false, vertical: true)
@@ -101,36 +97,21 @@ struct HubGridView: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 9) {
-            GemMark(size: 22)
-            Text("Quiver").font(.system(size: 15, weight: .bold))
-            Spacer()
-            Button(editing ? "Done" : "Edit") { withAnimation { editing.toggle() } }
-                .buttonStyle(.plain)
-                .font(.system(size: 12, weight: editing ? .semibold : .regular))
-                .foregroundStyle(editing ? Color.accentColor : .secondary)
-            CCIconButton(symbol: "gearshape", help: "Settings", action: onOpenSettings)
+    private var actionBar: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.84)) { editing.toggle() }
+        } label: {
+            Text(editing ? "Done" : "Edit Controls")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(editing ? Color.primary : Color.secondary)
+                .padding(.horizontal, 18)
+                .frame(height: 32)
+                .ccGlassCapsule()
         }
-        .padding(.horizontal, 14)
-        .frame(height: 42)
-        .shadow(color: .black.opacity(0.28), radius: 1.5, y: 0.5)
-        .ccGlassCapsule()
-    }
-
-    private var footer: some View {
-        HStack(spacing: 8) {
-            Button(action: onOpenApp) {
-                Label("Open Quiver", systemImage: "macwindow").font(.system(size: 11, weight: .medium))
-            }
-            .buttonStyle(.plain).foregroundStyle(.secondary)
-            Spacer()
-            CCIconButton(symbol: "power", help: "Quit Quiver", action: onQuit)
-        }
-        .padding(.horizontal, 14)
+        .buttonStyle(.plain)
+        .help(editing ? "Finish editing controls" : "Customize controls")
         .frame(height: 36)
         .shadow(color: .black.opacity(0.28), radius: 1.5, y: 0.5)
-        .ccGlassCapsule()
     }
 }
 
@@ -173,25 +154,6 @@ struct HubEditTile: View {
                 }
                 .buttonStyle(.plain).offset(x: -3, y: -3).help("Resize (\(size.label))")
             }
-    }
-}
-
-/// A subtle ghost icon button used in the hub chrome.
-struct CCIconButton: View {
-    let symbol: String
-    let help: String
-    let action: () -> Void
-    @State private var hover = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(hover ? Color.primary : Color.secondary)
-                .frame(width: 22, height: 22)
-                .background(Circle().fill(hover ? Color.primary.opacity(0.08) : Color.clear))
-        }
-        .buttonStyle(.plain).help(help).onHover { hover = $0 }
     }
 }
 

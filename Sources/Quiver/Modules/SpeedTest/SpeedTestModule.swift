@@ -30,6 +30,13 @@ final class SpeedTestModule: UtilityModule {
     override func start() { monitor.start() }
     override func stop() { monitor.stop() }
 
+    override var defaultTileSize: TileSize { .small }
+    override var controlCenterTitle: String { "Speed" }
+    override var controlCenterStatusSummary: String {
+        guard isEnabled else { return "Off" }
+        return "↓ \(NetworkMonitor.menuBarNumber(monitor.downloadMbps)) ↑ \(NetworkMonitor.menuBarNumber(monitor.uploadMbps))"
+    }
+
     override var statusSummary: String {
         guard isEnabled else { return "Off" }
         return "↓ \(NetworkMonitor.rateString(monitor.downloadMbps)) · ↑ \(NetworkMonitor.rateString(monitor.uploadMbps))"

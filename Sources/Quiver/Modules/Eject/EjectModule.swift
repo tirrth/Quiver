@@ -21,6 +21,17 @@ final class EjectModule: UtilityModule {
             .sink { [weak self] _ in DispatchQueue.main.async { self?.notifyChange() } }
     }
 
+    override var defaultTileSize: TileSize { .small }
+    override var controlCenterTitle: String { "Eject" }
+    override var controlCenterStatusSummary: String {
+        let count = service.volumes.count
+        switch count {
+        case 0: return "None"
+        case 1: return "1 drive"
+        default: return "\(count) drives"
+        }
+    }
+
     override var statusSummary: String {
         let count = service.volumes.count
         switch count {

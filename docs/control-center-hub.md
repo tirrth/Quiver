@@ -22,14 +22,27 @@ SwiftUI `.background` (`Glass.swift`). Key facts, each verified by live screensh
   the desktop and windows behind it" — real Liquid Glass *and* wallpaper frosting. `NSVisualEffectView`
   is the older frosted vibrancy. (SwiftUI `glassEffect` *also* samples the desktop here and looks
   equivalent — it's a fine alternative — but `NSGlassEffectView` is what's shipped.)
-- **`style = .clear` + a faint body fill + a bright edge rim** (the final, screenshot-tuned recipe). The
-  two NSGlassEffectView styles map out the whole space: `.regular` is **adaptive/frosted** — visible over a
-  light wallpaper but it **over-blurs** the backdrop (reads "too much blur" vs CC). `.clear` keeps the
-  wallpaper **crisp** (low blur, like CC) but on its own **vanishes over a light wallpaper** (no frost to
-  define it). So `GlassBackdrop` uses `.clear` for the crisp interior, plus a ~0.08 white fill (subtle body)
-  and a top-weighted white `strokeBorder` rim (~0.45→0.12) so each tile reads as a defined CC glass chip.
-  Verified over a tan-wallpaper backdrop matching the real CC reference. (`NSGlassEffectViewStyle` is in the
-  SDK header `…/AppKit.framework/Headers/NSGlassEffectView.h`.)
+- **The exact CC material is `_variant = 8` ("controlCenter") — the public styles are only approximations.**
+  ⭐ This is the current recipe (`CCGlassView` in `Glass.swift`), and it's the one that finally reads as CC.
+  The two public `NSGlassEffectViewStyle`s each miss: `.regular` is **adaptive/frosted** — over a light
+  wallpaper it **over-blurs** ("too much blur" / milky vs CC); `.clear` keeps the wallpaper **crisp** but on
+  its own is **too bare/edgeless** and nearly vanishes over a light wallpaper. The *real* Control Center uses
+  neither — it uses `NSGlassEffectView`'s **private `_variant` 8**, which is a translucent body **with a
+  defined specular rim** and wallpaper sampling. Set it via the private selector `set_variant:` (guarded by
+  `responds(to:)`; silently degrades to plain `.clear` if Apple renames it). Verified by a back-to-back
+  3-way capture over one wallpaper: `.regular` milky, `.clear` flat, **variant 8 = the CC glass chip**. The
+  variant enum (from the `electron-liquid-glass` project) also exposes `_subvariant`/`_scrimState`; the full
+  table has `regular=0, clear=1, … controlCenter=8, notificationCenter=9, … cartouchePopover=23`.
+- **Force non-subdued, or it frosts when the panel isn't key.** ⚠️ `NSGlassEffectView` flattens to a milky
+  frost in its **"subdued"** state whenever its window isn't key — and the hub is a nonactivating panel that
+  is *never* key, so it would frost on open and only "wake up" to the live render after interaction. The fix
+  is to **override the private `_subduedState` getter to always return `0`** (`@objc(_subduedState)` on
+  `CCGlassView`). The framework reads the material's subdued state through that getter, so pinning it to 0
+  keeps the live, lensed CC render permanently. (Setting `set_subduedState:` once does **not** stick — the
+  framework re-reads it; the getter override is what holds.) This was the "frosted-on-open until I click a
+  tile" bug. OK to use the SPI: Quiver is ad-hoc-signed and already links private frameworks (SkyLight).
+- **`effectIsInteractive = true` (macOS 27+)** drives the live specular *lensing* as content moves under the
+  glass — the visible "animation when you pass text/icons through it," and what makes it feel like CC.
 - **Do NOT set the glass `appearance` manually.** ⚠️ Hard-won: forcing `view.appearance = .aqua` to "keep it
   light" **over-frosted** it (milky/opaque) — Apple says explicitly *do not set appearance manually*
   (WWDC25 310); the material adapts by sampling the backdrop, and pinning the appearance defeats that.

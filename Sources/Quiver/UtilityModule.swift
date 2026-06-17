@@ -187,6 +187,11 @@ class UtilityModule: ObservableObject, Identifiable {
     /// One-line status shown in the menu (e.g. "On · delay 0ms").
     var statusSummary: String { isEnabled ? "On" : "Off" }
 
+    /// Short title/status tuned for native-sized Control Center chips. Defaults to the normal
+    /// presentation strings, while modules with longer names can override without renaming themselves.
+    var controlCenterTitle: String { title }
+    var controlCenterStatusSummary: String { statusSummary }
+
     /// A live text label to show next to this module's pinned menu-bar icon (e.g. a network speed
     /// readout). `nil` (the default) means icon-only. Refreshed whenever the module reports a change.
     var menuBarTitle: String? { nil }

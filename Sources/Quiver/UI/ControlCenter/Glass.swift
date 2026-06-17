@@ -8,25 +8,63 @@ import AppKit
 /// which the hosting layer prevents from sampling the desktop). Corners come from its own
 /// `cornerRadius`. Falls back to behind-window `NSVisualEffectView` (rounded via `maskImage`) on macOS
 /// < 26, and a solid fill under Reduce Transparency.
+/// An `NSGlassEffectView` configured with the *exact* material macOS Control Center uses. Two things make
+/// it match CC instead of looking like a generic frosted panel:
+///
+///  1. **`_variant = 8` ("controlCenter")** — `NSGlassEffectView`'s public `.regular`/`.clear` styles are
+///     only approximations (`.regular` reads too milky, `.clear` too bare/edgeless — verified by
+///     back-to-back captures over the same wallpaper). Variant 8 is the literal Control Center recipe:
+///     translucent body, a defined specular rim, and wallpaper sampling. It's private SPI (`set_variant:`),
+///     guarded by `responds(to:)` so a future rename silently degrades to plain `.clear` — still valid glass.
+///  2. **Never "subdued."** The system flattens the glass to a milky frost whenever its window isn't key —
+///     and the hub is a nonactivating panel that is *never* key, so it would frost permanently. Overriding
+///     the private `_subduedState` getter to always report `0` keeps the live, lensed CC render at all times.
+///
+/// OK to use private SPI here: Quiver is ad-hoc-signed (not App Store) and already links private frameworks
+/// (SkyLight, via `MenuBarReveal`). Both hooks fail safe.
+@available(macOS 26.0, *)
+private final class CCGlassView: NSGlassEffectView {
+    @objc(_subduedState) func subduedStateGetterOverride() -> Int { 0 }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        applyControlCenterMaterial()
+    }
+
+    func applyControlCenterMaterial() {
+        style = .clear
+        let sel = NSSelectorFromString("set_variant:")
+        guard responds(to: sel) else { return }
+        let imp = method(for: sel)
+        unsafeBitCast(imp, to: (@convention(c) (NSObject, Selector, Int) -> Void).self)(self, sel, 8)
+    }
+}
+
 @available(macOS 26.0, *)
 private struct LiquidGlass: NSViewRepresentable {
     var cornerRadius: CGFloat
     var tint: NSColor?
 
     func makeNSView(context: Context) -> NSGlassEffectView {
-        let view = NSGlassEffectView()
+        let view = CCGlassView()
         view.cornerRadius = cornerRadius
         view.tintColor = tint
-        // `.clear` is the most transparent Liquid Glass material — the content behind each tile shows through
-        // (almost readable), with just the glass's own refraction/lensing. No fill, no rim, no frost.
-        view.style = .clear
+        view.applyControlCenterMaterial()
+        // The interactive flag drives the live specular "lensing" as content moves under the glass — the
+        // exact effect Control Center shows (and what made the earlier transparent build feel right).
+        if #available(macOS 27.0, *) {
+            view.effectIsInteractive = true
+        }
         return view
     }
 
     func updateNSView(_ view: NSGlassEffectView, context: Context) {
         view.cornerRadius = cornerRadius
         view.tintColor = tint
-        view.style = .clear
+        (view as? CCGlassView)?.applyControlCenterMaterial()
+        if #available(macOS 27.0, *) {
+            view.effectIsInteractive = true
+        }
     }
 }
 

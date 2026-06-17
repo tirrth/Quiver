@@ -17,6 +17,8 @@ final class MetalHUDModule: UtilityModule {
     override func start() { applyHUD(true) }
     override func stop() { applyHUD(false) }
 
+    override var controlCenterTitle: String { "Metal" }
+    override var controlCenterStatusSummary: String { isEnabled ? "On" : "Off" }
     override var statusSummary: String { isEnabled ? "On · new apps show the HUD" : "Off" }
 
     override func makeSettingsView() -> AnyView { AnyView(MetalHUDSettingsView(module: self)) }

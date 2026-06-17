@@ -106,6 +106,14 @@ final class KeepAwakeModule: UtilityModule {
 
     // MARK: Presentation
 
+    override var defaultTileSize: TileSize { .small }
+    override var controlCenterTitle: String { "Awake" }
+    override var controlCenterStatusSummary: String {
+        guard isEnabled else { return "Off" }
+        if let expiresAt { return "Until \(Self.timeFormatter.string(from: expiresAt))" }
+        return keepDisplayAwake ? "Display on" : "On"
+    }
+
     override var statusSummary: String {
         guard isEnabled else { return "Off" }
         var parts = ["On"]

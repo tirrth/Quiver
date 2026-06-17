@@ -278,6 +278,13 @@ final class ShelfModule: UtilityModule {
     override func start() { controller.start() }
     override func stop() { controller.stop() }
 
+    override var defaultTileSize: TileSize { .wide }
+    override var controlCenterTitle: String { "Deck" }
+    override var controlCenterStatusSummary: String {
+        guard isEnabled else { return "Off" }
+        return controller.store.isEmpty ? "Empty" : "\(controller.store.totalItems) held"
+    }
+
     override var statusSummary: String {
         guard isEnabled else { return "Off" }
         if controller.store.isEmpty { return "On · empty · drag files in" }

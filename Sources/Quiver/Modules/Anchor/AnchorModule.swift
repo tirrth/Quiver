@@ -51,6 +51,8 @@ final class AnchorModule: UtilityModule {
         if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
     }
 
+    override var defaultTileSize: TileSize { .wide }
+
     private func observeActivation() {
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -204,6 +206,13 @@ final class AnchorModule: UtilityModule {
     }
 
     // MARK: Presentation
+
+    override var controlCenterTitle: String { "Snap" }
+    override var controlCenterStatusSummary: String {
+        guard isEnabled else { return "Off" }
+        if !AutoRaiseEngine.isAccessibilityTrusted() { return "Needs access" }
+        return gap > 0 ? "\(gap) px gap" : "On"
+    }
 
     override var statusSummary: String {
         guard isEnabled else { return "Off" }

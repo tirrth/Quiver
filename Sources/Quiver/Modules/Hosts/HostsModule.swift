@@ -46,6 +46,8 @@ final class HostsModule: UtilityModule {
         }
     }
 
+    override var defaultTileSize: TileSize { .wide }
+
     /// Install or remove the root-owned passwordless helper (one admin prompt).
     func setPasswordless(_ enabled: Bool) {
         let previous = passwordlessEnabled
@@ -74,6 +76,11 @@ final class HostsModule: UtilityModule {
 
     override var statusSummary: String {
         "\(viewModel.activeCount) on · \(viewModel.disabledCount) off"
+    }
+
+    override var controlCenterTitle: String { "Hosts" }
+    override var controlCenterStatusSummary: String {
+        "\(viewModel.activeCount) on"
     }
 
     override func makeQuickControls() -> AnyView? {
