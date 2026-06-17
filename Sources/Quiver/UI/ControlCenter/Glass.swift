@@ -118,8 +118,18 @@ private struct GlassBackdrop: View {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(Color(nsColor: .windowBackgroundColor))
         } else if #available(macOS 26.0, *) {
-            // The real system Control Center glass material (private variant 8) — no fill/rim approximations.
+            // The real system Control Center glass material (private variant 8), PLUS a fixed dim scrim.
+            // ⭐ How CC actually stays legible over a white background (measured from a real-CC capture): it
+            // keeps its content WHITE and DIMS the glass to a mid-gray. A real CC tile reads ~190 over a
+            // pure-white backdrop; a bare variant-8 tile reads ~243 (so white text washes out — the old bug).
+            // A constant ~0.25 black scrim on the glass lands our tile at ~190 over white too, and because
+            // it's constant it also works over dark backdrops (no content-color flip, no Screen Recording).
+            // The scrim is only 25% opaque, so the glass still samples + lenses colored wallpapers through it.
             LiquidGlass(cornerRadius: cornerRadius)
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color.black.opacity(0.25))
+                )
         } else {
             WallpaperGlass(cornerRadius: cornerRadius)
         }

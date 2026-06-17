@@ -60,6 +60,17 @@ SwiftUI `.background` (`Glass.swift`). Key facts, each verified by live screensh
   pin the *panel* appearance to `.darkAqua` — that turns the glass dark. Decouple: the glass renders light
   naturally; the dark color scheme only flips the SwiftUI `.primary`/`.secondary` content colors white.
   A small legibility shadow sits under the white glyphs.
+- **Legibility over a WHITE/bright backdrop = a constant dim scrim, NOT a content-color flip.** ⭐⭐ Hard-won;
+  do not re-litigate. Measured from a real-CC capture over a pure-white backdrop: **CC keeps its content
+  WHITE and dims the glass to a mid-gray** (a real CC tile reads **~190** over white; a bare variant-8 tile
+  reads **~243**, so white text washes out — that was the bug). CC does **NOT** flip text to dark. (An earlier
+  attempt that sampled the backdrop via ScreenCaptureKit and flipped content dark/light was **wrong** and was
+  reverted — verified against the real thing.) The fix is a **constant `Color.black.opacity(0.25)` scrim
+  overlaid on the glass** (in `GlassBackdrop`), under the white content: it lands the tile at ~190 over white
+  (matched to CC), and because it's constant it also works over dark/colored backdrops — no flip, no
+  ScreenCaptureKit, no Screen Recording permission. At 25% opacity the glass still samples + lenses colored
+  wallpapers through it. (Pixel check: CC tile ~189, ours ~190; CC gaps/margins are near-white ~244, so there
+  is **no** strong full-panel "parent" scrim — the gray is the tiles + their soft shadows.)
 
 ## Tile-merging ("blob") — DO NOT re-attempt
 
