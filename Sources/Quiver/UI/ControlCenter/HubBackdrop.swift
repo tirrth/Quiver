@@ -19,14 +19,14 @@ final class HubBackdrop {
     private static let blurRadius: CGFloat = 3
     /// Subtle dark dim laid over the blur (0 = none), feathered with the same halo so it fades out at the
     /// edges — the slight darkening real Control Center adds for separation. Keep it gentle ("not blackish").
-    private static let dimOpacity: CGFloat = 0.1
+    private static let dimOpacity: CGFloat = 0.05
     /// Spacing the *full-strength* blur extends beyond the hub's outline before it begins to fade — the gap
     /// that lets the halo trace the panel shape with a little breathing room.
     private static let featherInset: CGFloat = 18
     /// The distance over which the blur fades from full strength to fully clear (the soft halo edge).
-    private static let featherWidth: CGFloat = 70
+    private static let featherWidth: CGFloat = 60
     /// Corner radius of the rounded-rect halo (so it matches the hub's outline rather than being a circle).
-    private static let cornerRadius: CGFloat = 20
+    private static let cornerRadius: CGFloat = 0
     private static let fadeIn: TimeInterval = 0.22
     private static let fadeOut: TimeInterval = 0.16
 
