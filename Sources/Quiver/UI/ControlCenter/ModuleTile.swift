@@ -74,7 +74,7 @@ struct ModuleTileFace: View {
     /// 2×1 — frosted glass squircle: icon circle on the left, name + status to the right.
     private var wide: some View {
         HStack(spacing: 12) {
-            innerCircle(42)   // measured against real CC: the wide-control icon circle is ~44pt (in a ~63pt tile)
+            innerCircle(38)   // wide-control icon chip
             VStack(alignment: .leading, spacing: 1) {
                 Text(module.controlCenterTitle)
                     .font(.system(size: 15, weight: .semibold))
