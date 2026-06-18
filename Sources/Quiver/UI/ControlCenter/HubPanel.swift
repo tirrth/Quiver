@@ -77,14 +77,18 @@ final class HubPanel {
                       let (anchor, screen) = self.topCenterAnchor(for: button) else { return }
                 self.anchorTopCenter = anchor
                 self.anchorScreen = screen
+                // The gem turned out to be on a different display than the provisional guess — move the
+                // menu-bar reveal to the correct screen (clears the provisional one).
+                MenuBarReveal.reveal(display: screen.displayID)
                 self.relayout()
             }
         }
         positionPanel(size: size)
         // Keep the system menu bar revealed for the panel's lifetime — including over a full-screen app,
         // where it auto-hides (a floating panel can't hold it via menu tracking). SkyLight SPI; restored on
-        // close. The panel is key for controls, but nonactivating and closed on app activation changes.
-        MenuBarReveal.reveal()
+        // close. Scope it to the hub's display so opening on one screen doesn't reveal the *other* screen's
+        // menu bar (the launch-race retry below re-targets it if the panel lands on a different display).
+        MenuBarReveal.reveal(display: anchorScreen?.displayID)
         // The CC-style background blur sits one window below the hub; order the hub directly above it.
         if let screen = anchorScreen { backdrop.show(on: screen, hubFrame: panel.frame) }
         panel.makeKeyAndOrderFront(nil)
@@ -200,4 +204,11 @@ final class HubPanel {
 final class ControlCenterPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+}
+
+extension NSScreen {
+    /// The `CGDirectDisplayID` for this screen (from `NSScreenNumber`), for per-display SkyLight calls.
+    var displayID: CGDirectDisplayID? {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+    }
 }

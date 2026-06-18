@@ -16,22 +16,36 @@ private func SLSMainConnectionID() -> Int32
 @_silgen_name("SLSSetMenuBarVisibilityOverrideOnDisplay")
 private func SLSSetMenuBarVisibilityOverrideOnDisplay(_ cid: Int32, _ display: CGDirectDisplayID, _ override: Bool) -> CGError
 
-/// Reveals / un-reveals the system menu bar (across all active displays) while the hub panel is open.
+/// Reveals / un-reveals the system menu bar while the hub panel is open.
 @MainActor
 enum MenuBarReveal {
     private static let cid: Int32 = SLSMainConnectionID()
 
-    /// Keep the menu bar shown for the hub's lifetime, even over a full-screen app.
-    static func reveal() { setOverride(true) }
+    /// Keep the menu bar shown for the hub's lifetime — on the display the hub is on **only**, so opening the
+    /// hub on one screen doesn't force the *other* screen's menu bar visible (it was revealing all displays).
+    /// Clears any prior override first, so re-targeting (e.g. the launch-race reposition onto another display)
+    /// never leaves a different screen's bar stuck open. `display == nil` falls back to all displays.
+    static func reveal(display: CGDirectDisplayID?) {
+        setOverride(false, on: activeDisplays())   // drop any previous reveal first
+        if let display {
+            _ = SLSSetMenuBarVisibilityOverrideOnDisplay(cid, display, true)
+        } else {
+            setOverride(true, on: activeDisplays())
+        }
+    }
 
-    /// Drop the override so the bar resumes normal auto-hide. Idempotent — safe to call on close, on quit,
-    /// and at launch (to clear a leftover override from a crash).
-    static func restore() { setOverride(false) }
+    /// Drop the override on every display. Idempotent — safe to call on close, on quit, and at launch (to
+    /// clear a leftover override from a crash).
+    static func restore() { setOverride(false, on: activeDisplays()) }
 
-    private static func setOverride(_ on: Bool) {
+    private static func activeDisplays() -> [CGDirectDisplayID] {
         var displays = [CGDirectDisplayID](repeating: 0, count: 16)
         var count: UInt32 = 0
-        guard CGGetActiveDisplayList(16, &displays, &count) == .success else { return }
-        for i in 0..<Int(count) { _ = SLSSetMenuBarVisibilityOverrideOnDisplay(cid, displays[i], on) }
+        guard CGGetActiveDisplayList(16, &displays, &count) == .success else { return [] }
+        return Array(displays.prefix(Int(count)))
+    }
+
+    private static func setOverride(_ on: Bool, on displays: [CGDirectDisplayID]) {
+        for display in displays { _ = SLSSetMenuBarVisibilityOverrideOnDisplay(cid, display, on) }
     }
 }

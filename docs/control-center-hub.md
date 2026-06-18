@@ -135,10 +135,15 @@ our dense grid**:
 Over a full-screen app macOS auto-hides the menu bar, and a floating panel can't hold it via menu tracking
 (only a real `NSMenu` does — which is why the *pinned `statusItem.menu` items* keep it). The fix is the
 private **SkyLight** SPI `SLSSetMenuBarVisibilityOverrideOnDisplay(cid, displayID, true)` — the same call
-SketchyBar uses (`src/misc/extern.h`). `MenuBarReveal.reveal()` sets it on every active display when the hub
-opens; `restore()` clears it on close (and at launch, to recover from a crash). Verified by screencapture:
-the menu bar appears over a full-screen app while the hub is open and hides again on close.
+SketchyBar uses (`src/misc/extern.h`). `MenuBarReveal.reveal(display:)` sets it on **the hub's display only**
+when the hub opens; `restore()` clears it on close (and at launch, to recover from a crash). Verified by
+screencapture: the menu bar appears over a full-screen app while the hub is open and hides again on close.
 
+- **Reveal only the hub's display, not all of them.** ⚠️ It used to override *every* active display, so opening
+  the hub on one screen forced the **other** screen's (auto-hidden / full-screen) menu bar visible too — a
+  real two-display bug. `reveal(display:)` now takes the hub's `NSScreen.displayID` and overrides just that
+  one (clearing any prior override first, so the launch-race reposition onto another display re-targets
+  cleanly instead of leaving two screens stuck open). `display == nil` falls back to all displays.
 - It's a **per-display visibility override**, NOT the global "Automatically hide the menu bar" preference
   (`SLSSetMenuBarAutohideEnabled` would change that user setting — avoided). So it never touches System
   Settings; it just forces visibility while open.
