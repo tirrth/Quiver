@@ -149,14 +149,28 @@ the menu bar appears over a full-screen app while the hub is open and hides agai
   **failed** (an event, not a state; and an active `.accessory` app has no menu bar — Apple FB13544993 — and
   `.regular`+activate did not reveal the bar over a full-screen Space). Both removed. Don't re-attempt.
 
-## The one thing a floating panel still CANNOT do — the native highlight
+## The native status-item highlight — SOLVED with `button.highlight(_:)`
 
-The hub is a **nonactivating, never-key** `.borderless` panel (`orderFrontRegardless()`). The native
-status-item highlight needs the panel to be the **key** window — and a key window renders `NSGlassEffectView`
-**milky/opaque** instead of crisp/translucent (verified by back-to-back screenshots: key = milky, non-key =
-crisp). So the native highlight and crisp CC glass are mutually exclusive for the floating panel; crisp glass
-was chosen. The only way to get the highlight too is the `statusItem.menu = hubMenu` (NSMenu) path — which
-also gets native positioning for free, at the cost of the detached floating look.
+The gem shows the **real** system menu-bar selection background while the hub is open (the same one an
+`NSMenu`-backed item gets) — no custom-drawn pill. The official API is `NSStatusBarButton.highlight(_:)`;
+two non-obvious things were needed to make it actually render and stick:
+
+- **Do NOT override the button cell's `highlightsBy`.** `NSStatusBarButton` already draws the menu-bar
+  selection when highlighted; setting `cell.highlightsBy = [.changeBackgroundCellMask, …]` replaces that with
+  a plain `NSButtonCell` highlight which, on a borderless status button, draws **nothing visible**. Removing
+  that override was the fix that made the native highlight appear at all. (This was the old bug — it looked
+  like nothing happened, so earlier code faked it with a hand-drawn pill image + a width change, which read
+  wrong and shifted the icon.)
+- **Set `highlight(true)` on the next runloop tick, after the panel is shown.** A status button clears its
+  own highlight when the triggering click's mouse-up tracking finishes — which is *after* the action returns —
+  so a synchronous `highlight(true)` inside the action is immediately undone. `DispatchQueue.main.async`
+  (guarded by `hubPanel.isShown` against a fast open→close) makes it stick for the panel's lifetime;
+  `setStatusIconHighlighted(false)` on close clears it. The highlight is owned solely by `AppController`
+  (`openHubPanel` / `hubPanel.onClose`); `HubPanel` doesn't touch the button.
+
+The earlier worry that "the highlight needs the panel to be key, and key glass goes milky" no longer applies:
+the glass is kept crisp regardless of key state by the `_subduedState` override (see the glass section), and
+the highlight comes from the button, not from key-window state — the two are independent.
 
 ## Panel positioning & sizing
 

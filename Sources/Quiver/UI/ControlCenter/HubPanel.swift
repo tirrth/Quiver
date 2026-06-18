@@ -28,7 +28,8 @@ final class HubPanel {
     func show(_ content: AnyView, below button: NSStatusBarButton?) {
         close(notify: false)
         anchorButton = button
-        button?.highlight(true)
+        // The status-item highlight is owned by AppController (set after the panel is shown), so the panel
+        // doesn't touch the button here.
 
         let host = NSHostingController(rootView: content)
         host.view.layoutSubtreeIfNeeded()

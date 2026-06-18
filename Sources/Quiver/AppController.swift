@@ -166,13 +166,21 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
 
     // MARK: Menu bar
 
+    /// A stable name macOS uses to persist the gem's menu-bar slot across launches.
+    private static let gemAutosaveName = "QuiverGem"
+
     private func configureStatusItem() {
+        // Make the gem "sticky": `autosaveName` is the one supported way to persist a status item's menu-bar
+        // slot across launches — without it, macOS 11+ reshuffles the order on every relaunch. Drag the gem
+        // where you want it once (e.g. as far right as it'll go, against the system / Control Center cluster)
+        // and it stays there. macOS won't let a third-party item sit to the RIGHT of the system items.
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.autosaveName = Self.gemAutosaveName
         item.button?.image = currentStatusImage()
         item.button?.imagePosition = .imageOnly
-        if let cell = item.button?.cell as? NSButtonCell {
-            cell.highlightsBy = [.contentsCellMask, .changeBackgroundCellMask]
-        }
+        // Don't override the cell's highlight masks — `NSStatusBarButton` already draws the proper menu-bar
+        // selection background when highlighted; a custom `highlightsBy` replaces that with a plain (and on a
+        // borderless button, invisible) button-cell highlight.
         item.button?.toolTip = "Quiver"
         // Clicking the icon toggles a floating Control-Center-style glass panel.
         item.button?.target = self
@@ -195,9 +203,16 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     private func openHubPanel() {
         menuBarCoordinator.closeOpenPanels()    // close the camera / other transient panels
         refreshModulePermissions()
-        setStatusIconHighlighted(true)
         hubPanel.show(hubContent(), below: statusItem?.button)
-        setStatusIconHighlighted(true)
+        // Apply the highlight on the next runloop tick: a status button clears its own highlight when the
+        // triggering click's mouse-up tracking finishes — which happens *after* this action returns — so
+        // setting it synchronously here is immediately undone. Dispatching past that makes it stick for the
+        // panel's lifetime (cleared again in `setStatusIconHighlighted(false)` on close). Guard on `isShown`
+        // so a fast open→close doesn't leave the highlight stuck on after the panel has already closed.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.hubPanel.isShown else { return }
+            self.setStatusIconHighlighted(true)
+        }
     }
 
     /// The hub's SwiftUI content for the floating panel. Actions close the panel first, then run.
@@ -379,53 +394,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         return Self.gemStatusImage(scale: settings.menuBarIconScale, yOffset: settings.menuBarIconYOffset)
     }
 
-    /// A non-template selected-state status image. NSStatusBarButton's normal highlight drawing is tied
-    /// to menu tracking/key-window behavior, so the floating nonactivating panel uses an image that
-    /// carries the native selected pill with the icon centered inside it.
-    private func highlightedStatusImage() -> NSImage {
-        let glyphSide = 18 * settings.menuBarIconScale
-        let symbolName = settings.menuBarIconSymbol
-        let symbolPointSize = 15 * settings.menuBarIconScale
-        let yOffset = settings.menuBarIconYOffset
-        let width = max(CGFloat(44), glyphSide + 24)
-        let height: CGFloat = 26
-        let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
-            NSColor.white.withAlphaComponent(0.22).setFill()
-            NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 13, yRadius: 13).fill()
-
-            let glyphRect = NSRect(
-                x: rect.midX - glyphSide / 2,
-                y: rect.midY - glyphSide / 2 - yOffset,
-                width: glyphSide,
-                height: glyphSide
-            )
-            if let symbol = symbolName,
-               let symbolImage = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
-                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: symbolPointSize, weight: .regular)) {
-                symbolImage.isTemplate = true
-                NSColor.white.set()
-                symbolImage.draw(in: glyphRect)
-            } else if let ctx = NSGraphicsContext.current?.cgContext {
-                Self.drawMenuGem(in: glyphRect, ctx: ctx, color: .white)
-            }
-            return true
-        }
-        image.isTemplate = false
-        return image
-    }
-
+    /// Show the *native* menu-bar selection highlight behind the gem while the hub is open — the same
+    /// system-drawn background macOS gives an `NSMenu`-backed status item. `NSStatusBarButton.highlight(_:)`
+    /// is the official API for this; we just keep it on for the panel's lifetime and clear it on close. No
+    /// image swap or width change (the old workaround), so the gem doesn't shift and the look is the real one.
     private func setStatusIconHighlighted(_ highlighted: Bool) {
-        guard let item = statusItem else { return }
-        if highlighted {
-            let image = highlightedStatusImage()
-            item.length = max(44, image.size.width)
-            item.button?.image = image
-            item.button?.highlight(true)
-        } else {
-            item.length = NSStatusItem.variableLength
-            item.button?.image = currentStatusImage()
-            item.button?.highlight(false)
-        }
+        statusItem?.button?.highlight(highlighted)
     }
 
     private func refreshStatusIcon() {
